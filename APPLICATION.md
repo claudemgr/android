@@ -862,6 +862,18 @@ Creation order: security-only workflows first, `ci.yml`/`release.yml` last; ever
 - Custom security greps (e.g. hardcoded-password patterns) maintain their exclusion list in the workflow with a documented reason per exclusion — never delete an exclusion without checking why it exists.
 - Renovate for dependency updates — never Dependabot.
 
+## Post-Push CI Verification
+
+`act --list -W {file}` and a local `make check`-equivalent pass only prove the workflow's syntax/job graph is valid and the code works in the local environment — they are not the real CI build. Every push (normal feature-branch push or an emergency direct push to the default branch) triggers a real CI run on the provider's infrastructure with real secrets, real matrix jobs, and the real `casjaysdev/android:latest` toolchain image; any of those can fail even when every local check passed. Treating "local checks passed" as equivalent to "the build is green" is itself a bug.
+
+After every push, check the triggered run's status:
+- **GitHub**: `gh run list --branch {branch} --commit {sha} --limit 1` then `gh run watch {run-id}` (or `gh run view {run-id} --json status,conclusion`)
+- **GitLab**: `curl -qsSf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" ".../repository/commits/{sha}/statuses"`
+- **Gitea / Forgejo**: `curl -qsSf -H "Authorization: token $TOKEN" ".../commits/{sha}/status"`
+- **Jenkins**: poll the job's `lastBuild/api/json` for `result`
+
+Build failed → this is a bug, not a note for later; diagnose the root cause and fix it with a follow-up commit — never leave the default branch red. Build pending/running → the task is not done yet; wait and re-check. No CI config in the project → this step is a no-op.
+
 ---
 
 # PART 13: RELEASE, SIGNING & F-DROID
