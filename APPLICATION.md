@@ -404,7 +404,7 @@ Production releases come from `release.yml` on tag push — no local release pat
 5. Re-read `COMMIT_MESS` against the diff; rewrite if anything is missing.
 6. `gitcommit --dir {dir} all` — the only commit path; never bare `git commit`, never `-m`.
 
-**Format:** `{emoji} Title (≤64 chars) {emoji}` + blank line + body + `- path: change` bullets. Emoji map: ✨ feat · 🐛 fix · 📝 docs · 🎨 style · ♻️ refactor · ⚡ perf · ✅ test · 🔧 chore · 🔒 security · 🗑️ remove · 🚀 deploy · 📦 deps. No bare `@` handles; no attribution trailers; one logical change per commit. **Findings-based work (audits, reviews, numbered fix-lists) defaults to one commit per finding — never batch distinct findings into one commit just because they share a file or session.**
+**Format:** `{emoji} Title (≤64 chars) {emoji}` + blank line + body + `- path: change` bullets. Emoji map: ✨ feat · 🐛 fix · 📝 docs · 🎨 style · ♻️ refactor · ⚡ perf · ✅ test · 🔧 chore · 🔒 security · 🗑️ remove · 🚀 deploy · 📦 deps. No bare `@` handles; no attribution trailers; one logical change per commit. **Findings-based work (audits, reviews, numbered fix-lists) defaults to one commit per finding — never batch distinct findings into one commit just because they share a file or session. Feature work is the opposite — one commit for the whole feature, never split per part. Unrelated bugs found mid-feature go to `TODO.AI.md`, except app-breaking bugs, which must be fixed immediately.**
 
 ## Terminology
 
