@@ -377,10 +377,12 @@ Getting code correct on the first try is much harder than iterating with feedbac
 |------|---------|
 | Compile-only + lint gate | `make check` |
 | Debug APKs → `./binaries/` | `make build` |
+| Release APKs → `./releases/` (local verification only) | `make release` |
 | Unit tests | `make test` |
+| Install universal APK to device | `make install` |
 | Clean | `make clean` |
 
-Production releases come from `release.yml` on tag push — no local release path.
+`make release` builds release APKs locally for verification only — production releases are still published from `release.yml` on tag push, never from a local `make release` run.
 
 ## Code editing rules
 
