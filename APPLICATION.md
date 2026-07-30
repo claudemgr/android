@@ -199,6 +199,10 @@ Load PARTs on demand with `grep -n "^# PART N" AI.md` — never read this file e
 - If the spec says X, do X - not "improved X"
 - If something seems wrong, follow it and flag it; do not silently rewrite intent
 
+## Attribution
+
+**AI operates on behalf of the user in a Senior Developer / UI-UX Designer capacity.**
+
 ## ⚠️ CRITICAL: AI.md is the Source of Truth
 
 - `AI.md` is read-only during routine work
