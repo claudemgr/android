@@ -31,7 +31,7 @@ IDEA.md is the project PLAN. AI.md (this file) is the SOURCE OF TRUTH.
 
 ## IDEA.md Required Layout
 
-**Every IDEA.md MUST have exactly these three top-level sections, in this order. For the fillable Android template, see PART FINAL → "IDEA.md REFERENCE".**
+**Every IDEA.md MUST have exactly these three top-level sections, in this order. For the fillable Android template, see PART 14 → "IDEA.md REFERENCE".**
 
 ```markdown
 ## Project description
@@ -42,7 +42,7 @@ IDEA.md is the project PLAN. AI.md (this file) is the SOURCE OF TRUTH.
 
 (All project variables in `key: value` form. Required keys at minimum: `project_name`,
 `project_org`, `internal_name`, `internal_org`. Android apps add `app_id`, `min_sdk`,
-`ui_toolkit`, `store_targets`, and the `## Applicability` matrix — see PART FINAL.)
+`ui_toolkit`, `store_targets`, and the `### Applicability` matrix — see PART 14.)
 
 Example:
 
@@ -130,6 +130,7 @@ have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null ||
 | `{internal_name}` | IDEA.md `## Project variables` (set once at first run, never edited after) | First-time setup: copy from `{project_name}` |
 | `{internal_org}` | IDEA.md `## Project variables` (set once at first run, never edited after) | First-time setup: copy from `{project_org}` |
 | `{app_id}` | **Derived (not stored)**: `io.github.{internal_org}.{internal_name}` | Existing app: read `applicationId` from `app/build.gradle` and freeze it in IDEA.md |
+| `{app_id_path}` | **Derived (not stored)**: `{app_id}` with dots replaced by slashes, e.g. `com/example/app` | Recompute whenever `{app_id}` changes; never store separately |
 
 **Detection commands (use commands — never guess):**
 ```bash
@@ -171,21 +172,21 @@ Load PARTs on demand with `grep -n "^# PART N" AI.md` — never read this file e
 
 | PART | Title | ~Line |
 |------|-------|-------|
-| 0 | CRITICAL RULES - READ FIRST | 192 |
-| 1 | PROJECT FILES & GOVERNANCE | 311 |
-| 2 | ANDROID APPLICATION MODEL | 415 |
-| 3 | PROJECT STRUCTURE | 473 |
-| 4 | TOOLCHAIN, BUILD & DOCKER | 535 |
-| 5 | STORAGE & DATABASE | 628 |
-| 6 | SECURITY & CRYPTO | 662 |
-| 7 | UI, THEMING, ACCESSIBILITY, I18N | 691 |
-| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 728 |
-| 9 | NETWORK & CONNECTIVITY | 761 |
-| 10 | BACKUP, RESTORE & SYNC | 792 |
-| 11 | TESTING & EMULATORS | 813 |
-| 12 | CI/CD WORKFLOWS | 840 |
-| 13 | RELEASE, SIGNING & F-DROID | 867 |
-| FINAL | IDEA.md REFERENCE | 905 |
+| 0 | CRITICAL RULES - READ FIRST | 193 |
+| 1 | PROJECT FILES & GOVERNANCE | 316 |
+| 2 | ANDROID APPLICATION MODEL | 422 |
+| 3 | PROJECT STRUCTURE | 480 |
+| 4 | TOOLCHAIN, BUILD & DOCKER | 542 |
+| 5 | STORAGE & DATABASE | 635 |
+| 6 | SECURITY & CRYPTO | 669 |
+| 7 | UI, THEMING, ACCESSIBILITY, I18N | 698 |
+| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 735 |
+| 9 | NETWORK & CONNECTIVITY | 768 |
+| 10 | BACKUP, RESTORE & SYNC | 799 |
+| 11 | TESTING & EMULATORS | 820 |
+| 12 | CI/CD WORKFLOWS | 847 |
+| 13 | RELEASE, SIGNING & F-DROID | 886 |
+| 14 | IDEA.md REFERENCE | 924 |
 
 ---
 
@@ -511,7 +512,7 @@ Every non-trivial user flow (onboarding, primary task, import/export) is documen
 
 ## Package layout (under `{app_id}`)
 
-Organize by responsibility, plural-free Android convention (packages are singular by Java convention):
+Organize by responsibility, using plural package names (this project's convention):
 
 | Package | Responsibility |
 |---|---|
@@ -704,10 +705,10 @@ Offer per-credential persistence levels where secrets are cached:
 
 ## Accessibility (required, not optional)
 
-- Full TalkBack support: content descriptions everywhere, state announcements for async operations, ANSI/markup stripped before screen-reader text.
+- Full TalkBack support: content descriptions everywhere, state announcements for async operations, markup stripped before screen-reader text.
 - Keyboard navigation: Tab/arrow/Enter/Escape traversal, visible focus indicators, hardware-keyboard shortcuts for primary actions.
 - High-contrast mode toggle applied as a palette overlay.
-- Touch targets ≥ 44×44dp; a large-touch-target preference where the UI is dense.
+- Touch targets ≥ 48×48dp; a large-touch-target preference where the UI is dense.
 
 ## I18N
 
@@ -790,7 +791,7 @@ Include only if the IDEA.md `## Applicability` matrix declares `network: yes`.
 ## Connectivity & threading
 
 - Connectivity state via `ConnectivityManager.NetworkCallback` exposed as `StateFlow` — never polling.
-- All network calls are `suspend` on `Dispatchers.IO`; never on Main (PART 2 threading discipline).
+- All network calls are `suspend` on `Dispatchers.IO`; never on Main (PART 0 threading discipline).
 - Every network error surfaces through the PART 2 error surfaces with a retry path; no raw exceptions to the user.
 
 ---
@@ -833,7 +834,7 @@ Include only if the IDEA.md `## Applicability` matrix declares `backup_sync: yes
 
 A `scripts/android-emulator.sh` helper manages headless test emulators:
 - One AVD per (type, size); one running emulator at a time.
-- Subcommands `start` / `stop` / `delete` / `clean` / `list`; types `phone` / `tablet` / `fold` / `tv`, optional `small` / `large`.
+- Subcommands `start` / `stop` / `delete` / `clean` / `list`; types `phone` / `tablet` / `fold` / `tv` / `wear` / `auto`, optional `small` / `large`.
 - Pin `-port` and address the instance as `adb -s emulator-{port}` so boot-waits can't attach to a stale instance.
 - Auto-install missing SDK pieces via `sdkmanager` **inside the container/emulator host**, never the dev host.
 
@@ -863,7 +864,7 @@ Creation order: security-only workflows first, `ci.yml`/`release.yml` last; ever
 - Third-party actions pinned to full commit SHAs, never tags.
 - Signing keystore decoded from a `KEYSTORE_BASE64` secret at job time — never committed.
 - Gradle cache keyed on `hashFiles('**/*.gradle*', '**/gradle-wrapper.properties')`.
-- truffleHog secret scan on every push/PR.
+- TruffleHog secret scan on every push/PR.
 - OWASP DependencyCheck in `release.yml`; CVSS ≥ 7.0 fails; suppressions live in `config/dependency-check-suppressions.xml` with a reason comment per entry.
 - Custom security greps (e.g. hardcoded-password patterns) maintain their exclusion list in the workflow with a documented reason per exclusion — never delete an exclusion without checking why it exists.
 - Renovate for dependency updates — never Dependabot.
@@ -920,11 +921,15 @@ If the app shows a "What's New" screen, its asset (`app/src/main/assets/whats_ne
 
 ---
 
-# PART FINAL: IDEA.md REFERENCE
+# PART 14: IDEA.md REFERENCE
 
 `IDEA.md` holds everything project-specific this template deliberately leaves open:
 
 ```markdown
+## Project description
+{Brief description of what the app does, its primary users, and what problem it
+solves. Free-form prose, 1–3 paragraphs.}
+
 ## Project variables
 project_name: ...
 project_org: ...
@@ -938,7 +943,7 @@ di: manual                # manual (default), koin, or hilt (declared need only)
 store_targets: fdroid, provider-releases   # play is opt-in
 form_factors: phone       # add wear/tv/auto/widget as needed
 
-## Applicability
+### Applicability
 database: yes|no
 network: yes|no
 notifications: yes|no
@@ -946,7 +951,7 @@ background_work: yes|no
 backup_sync: yes|no
 media: yes|no
 
-## Toolchain
+### Toolchain
 # Only if overriding casjaysdev/android:latest — document why
 build_image: casjaysdev/android:latest
 kotlin: ...
@@ -956,13 +961,15 @@ compile_sdk: ...
 target_sdk: ...
 version_code_scheme: ...  # semver-derived or manual
 
-## Features
+## Business logic
+
+### Features
 # App domain: feature list, package map additions, canonical user flows,
 # permission justifications (PART 2), sync coverage matrix (if PART 10 applies),
 # notification channel table + FG service type justifications (PART 8),
 # HTTP client choice (PART 9), theme list, supported locales
 
-## Release
+### Release
 # Keystore escrow location (never the keystore itself), release cadence,
 # crash-reporting endpoint if the ACRA-style opt-in is used (PART 2)
 ```

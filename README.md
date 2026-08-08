@@ -12,7 +12,7 @@ Template specifications for CasjaysDev Android projects. Each file is a master t
 
 | File | Purpose |
 |------|---------|
-| `APPLICATION.md` | Android application template — source of truth for Android projects |
+| `APPLICATION.md` | Android application template — source of truth for Android projects (PARTs 0–14) |
 | `README.md` | This file |
 | `LICENSE.md` | Repository license (WTFPL) |
 
