@@ -2,7 +2,7 @@
 
 **Name**: {project_name}
 
-**About this file:** `APPLICATION.md` is the master template for Android apps. When applied to a project, this file is copied (or symlinked) into the project as `AI.md`. Throughout this document, all references to `AI.md` refer to that resulting file in a real project.
+**About this file:** `AI.md` is the complete, authoritative specification for this Android project.
 
 **Note:** `{PROJECT_NAME}` and `{project_name}` in this file are reference tokens, not setup-time text replacements. Their values are resolved from `IDEA.md ## Project variables` while `AI.md` remains read-only.
 
@@ -22,8 +22,8 @@ IDEA.md is the project PLAN. AI.md (this file) is the SOURCE OF TRUTH.
 
 | File | Role | Update When |
 |------|------|-------------|
-| **AI.md** | SOURCE OF TRUTH - implementation rules (readonly template copy) | No — use SPEC.md for project-specific rule overrides |
-| **SPEC.md** | Project-specific rule overrides — created only when a rule must contradict the template or global. May be empty. SPEC.md wins over AI.md. | When a project rule must differ from the template or global |
+| **AI.md** | SOURCE OF TRUTH - implementation rules (readonly) | No — use SPEC.md for project-specific rule overrides |
+| **SPEC.md** | Project-specific rule overrides — created only when a rule must contradict this specification or global. May be empty. SPEC.md wins over AI.md. | When a project rule must differ from this specification or global |
 | **IDEA.md** | PROJECT PLAN - must follow AI.md | Features change, project variables change |
 
 **Rule hierarchy:** SPEC.md > AI.md > global CLAUDE.md. If SPEC.md and AI.md conflict, SPEC.md wins — that is its purpose.
@@ -31,7 +31,7 @@ IDEA.md is the project PLAN. AI.md (this file) is the SOURCE OF TRUTH.
 
 ## IDEA.md Required Layout
 
-**Every IDEA.md MUST have exactly these three top-level sections, in this order. For the fillable Android template, see PART 14 → "IDEA.md REFERENCE".**
+**Every IDEA.md MUST have exactly these three top-level sections, in this order. For the fillable IDEA.md template, see PART 14 → "IDEA.md REFERENCE".**
 
 ```markdown
 ## Project description
@@ -78,7 +78,7 @@ and any exceptions.)
 
 ## Migrating Existing `CLAUDE.md` Into `IDEA.md`
 
-**If a repository already has a pre-template `CLAUDE.md` or `.claude/CLAUDE.md` with real project details, those project details MUST be migrated into `IDEA.md`.**
+**If a repository already has a pre-existing `CLAUDE.md` or `.claude/CLAUDE.md` with real project details, those project details MUST be migrated into `IDEA.md`.**
 
 **What belongs in `IDEA.md`:**
 - project description / elevator pitch
@@ -319,8 +319,8 @@ This file cannot be fully read in one pass and must not be. Navigate with the PA
 
 | File | Purpose | Update When |
 |------|---------|-------------|
-| **AI.md** | Implementation spec (HOW) - SOURCE OF TRUTH, readonly template copy | No — use SPEC.md for project-specific rule overrides |
-| **SPEC.md** | Project-specific rule overrides (optional, may be empty) | When a project rule must contradict the template or global |
+| **AI.md** | Implementation spec (HOW) - SOURCE OF TRUTH, readonly | No — use SPEC.md for project-specific rule overrides |
+| **SPEC.md** | Project-specific rule overrides (optional, may be empty) | When a project rule must contradict this specification or global |
 | **IDEA.md** | Project plan (WHAT) | Features or variables change |
 | **TODO.AI.md** | Task tracking (AI-owned) | Tasks added/completed |
 | **TODO.md** | Task tracking (human-owned) | AI may mark done; never delete/empty |
@@ -343,7 +343,7 @@ This file cannot be fully read in one pass and must not be. Navigate with the PA
 
 **AI MUST verify its own work with real tools before reporting a task as done. Do not rely on "the code looks right."**
 
-**This rule applies to EVERY change type covered by this template — Kotlin logic, UI, storage, services, build, Docker, CI/CD, configuration, documentation, security — not only one category.** Whatever you touched, you verify.
+**This rule applies to EVERY change type covered by this specification — Kotlin logic, UI, storage, services, build, Docker, CI/CD, configuration, documentation, security — not only one category.** Whatever you touched, you verify.
 
 Getting code correct on the first try is much harder than iterating with feedback. Close the loop every time. All execution goes through the project's containerised targets — never a host SDK/Gradle/JDK.
 
@@ -421,7 +421,7 @@ Maintain a terminology table in IDEA.md for the app's domain nouns (what a "sess
 
 # PART 2: ANDROID APPLICATION MODEL
 
-This template targets a **single Kotlin Android application**: one `app/` module by default, form factors per IDEA.md (PART 7), zero-config first run, and no hosted services — the app may consume remote services but never hosts any.
+This specification targets a **single Kotlin Android application**: one `app/` module by default, form factors per IDEA.md (PART 7), zero-config first run, and no hosted services — the app may consume remote services but never hosts any.
 
 ## Application class
 
@@ -716,6 +716,24 @@ Offer per-credential persistence levels where secrets are cached:
 - Locale folders (`values-es/`, `values-fr/`, …) added as translations arrive; the language picker lists only locales with real translation files.
 - Dates/numbers via `java.text`/ICU formatting, never string concatenation.
 
+## Human-Readable Values (User-Facing Output)
+
+**Every value shown on a user-facing surface — Compose/View text, notifications, toasts — MUST be human-readable. Raw machine values belong to JSON/API payloads and logs only.**
+
+| Kind | Rule | Examples |
+|------|------|----------|
+| **Durations** | Largest fitting unit, at most two units, correct singular/plural: <60 s → seconds · ≥60 s → minutes · ≥60 min → hours · ≥24 h → days | `1 second` · `45 seconds` · `3 minutes` · `2 minutes 5 seconds` · `2 hours` · `1 hour 30 minutes` · `3 days 4 hours` |
+| **Sizes** | 1024 boundaries, full unit names, singular/plural, at most one decimal (drop `.0`): bytes → kilobytes → megabytes → gigabytes → terabytes | `1 byte` · `512 bytes` · `1 kilobyte` · `2.5 megabytes` · `5 gigabytes` · `1.2 terabytes` |
+| **Counts** | Locale-aware thousands separators | `12,847` |
+| **Timestamps** | Locale-aware via `java.text`/ICU formatting per the I18N rules above — never raw epoch values in visible text | `January 05, 2026 at 14:03:07 UTC` |
+
+| Rule | Detail |
+|------|--------|
+| **Shared helpers** | One implementation: `Format.duration()` / `Format.size()` / `Format.count()` in a shared util — never per-screen ad-hoc formatting |
+| **i18n** | Unit names go through plural string resources (`R.plurals.*`) with per-language plural rules — never hardcoded English unit strings |
+| **Raw value preserved** | UI MAY carry the machine value in a tooltip/`contentDescription` where useful; the visible text is always the human form |
+| **Machine surfaces unchanged** | JSON/API fields and log files keep raw base units (seconds, bytes) — formatting is a presentation concern only |
+
 ## Layout rules
 
 - Mobile-first, responsive to tablets and foldables (test via emulator types, PART 11).
@@ -923,7 +941,7 @@ If the app shows a "What's New" screen, its asset (`app/src/main/assets/whats_ne
 
 # PART 14: IDEA.md REFERENCE
 
-`IDEA.md` holds everything project-specific this template deliberately leaves open:
+`IDEA.md` holds everything project-specific this specification deliberately leaves open:
 
 ```markdown
 ## Project description
