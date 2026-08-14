@@ -113,9 +113,9 @@ and any exceptions.)
 # Project is not configured until IDEA.md exists and has required variables
 [ ! -f IDEA.md ] && echo "SETUP NEEDED - IDEA.md missing"
 
-have_name=$(grep -cE '^project_name:[[:space:]]*.+$' IDEA.md 2>/dev/null || true)
-have_org=$(grep -cE '^project_org:[[:space:]]*.+$' IDEA.md 2>/dev/null || true)
-have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null || true)
+have_name=$(grep -cE '^project_name:[[:space:]]*.+$' IDEA.md 2>/dev/null || echo 0)
+have_org=$(grep -cE '^project_org:[[:space:]]*.+$' IDEA.md 2>/dev/null || echo 0)
+have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null || echo 0)
 
 [ "$have_name" -eq 0 ] || [ "$have_org" -eq 0 ] || [ "$have_internal" -eq 0 ] && \
   echo "SETUP NEEDED - IDEA.md project variables incomplete"
@@ -137,7 +137,8 @@ have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null ||
 project_name=$(basename "$PWD")
 project_org=$(basename "$(dirname "$PWD")")
 internal_name="$project_name"
-app_id="io.github.${project_org}.${internal_name}"
+internal_org="$project_org"
+app_id="io.github.${internal_org}.${internal_name}"
 ```
 
 **Why a separate `{internal_name}`:** if a project renames itself later, the new name applies to user-visible places (app label, docs, repo). But `{internal_name}` — and therefore `{app_id}` — stays fixed forever. **An Android `applicationId` can NEVER change after first release**: changing it publishes a different app, orphans every install, and breaks updates. `{app_id}` is the single most immutable value in an Android project.
@@ -172,21 +173,21 @@ Load PARTs on demand with `grep -n "^# PART N" AI.md` — never read this file e
 
 | PART | Title | ~Line |
 |------|-------|-------|
-| 0 | CRITICAL RULES - READ FIRST | 193 |
-| 1 | PROJECT FILES & GOVERNANCE | 316 |
-| 2 | ANDROID APPLICATION MODEL | 422 |
-| 3 | PROJECT STRUCTURE | 480 |
-| 4 | TOOLCHAIN, BUILD & DOCKER | 542 |
-| 5 | STORAGE & DATABASE | 635 |
-| 6 | SECURITY & CRYPTO | 669 |
-| 7 | UI, THEMING, ACCESSIBILITY, I18N | 698 |
-| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 735 |
-| 9 | NETWORK & CONNECTIVITY | 768 |
-| 10 | BACKUP, RESTORE & SYNC | 799 |
-| 11 | TESTING & EMULATORS | 820 |
-| 12 | CI/CD WORKFLOWS | 847 |
-| 13 | RELEASE, SIGNING & F-DROID | 886 |
-| 14 | IDEA.md REFERENCE | 924 |
+| 0 | CRITICAL RULES - READ FIRST | 194 |
+| 1 | PROJECT FILES & GOVERNANCE | 317 |
+| 2 | ANDROID APPLICATION MODEL | 423 |
+| 3 | PROJECT STRUCTURE | 481 |
+| 4 | TOOLCHAIN, BUILD & DOCKER | 543 |
+| 5 | STORAGE & DATABASE | 637 |
+| 6 | SECURITY & CRYPTO | 671 |
+| 7 | UI, THEMING, ACCESSIBILITY, I18N | 700 |
+| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 755 |
+| 9 | NETWORK & CONNECTIVITY | 788 |
+| 10 | BACKUP, RESTORE & SYNC | 819 |
+| 11 | TESTING & EMULATORS | 840 |
+| 12 | CI/CD WORKFLOWS | 867 |
+| 13 | RELEASE, SIGNING & F-DROID | 907 |
+| 14 | IDEA.md REFERENCE | 972 |
 
 ---
 
@@ -387,7 +388,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | Install universal APK to device | `make install` |
 | Clean | `make clean` |
 
-`make release` builds release APKs locally for verification only — production releases are still published from `release.yml` on tag push, never from a local `make release` run.
+`make release` builds release APKs locally for verification only — production releases are still published by the channel workflows (PART 12/13), never from a local `make release` run.
 
 ## Code editing rules
 
@@ -574,6 +575,7 @@ This picks the toolchain image only; any runtime/service image the project ships
 |---|---|
 | `debug` | Local dev; debuggable; `.debug` applicationId suffix optional |
 | `release` | Shipped build; R8 minify + shrinkResources; signed |
+| `devel` | Development-channel build (PART 13): `release` configuration plus devel/debug features and the Debug Log enabled via `BuildConfig` flags (`DEVEL`, `DEBUG_LOG`); not debuggable; signed; Logger sanitation (PART 6) applies here too — the Debug Log is never exempt |
 | `fdroidRelease` | Reproducible flavor for F-Droid (PART 13) — only if the app targets F-Droid |
 
 ## APK splits and naming
@@ -871,10 +873,11 @@ Provider-specific file locations and syntax: the matching `*_conventions.md` glo
 | Workflow | Trigger | Job |
 |---|---|---|
 | `ci.yml` | push + PR to main | `make check`-equivalent: compile, lint, unit tests, structure/security validation |
-| `dev-builds.yml` | push to dev branches | `assembleDebug`, rename to `{project_name}-*-dev.apk`, SHA-256 sums, publish rolling prerelease |
-| `release.yml` | tag `v*` | tests + DependencyCheck + coverage → `assembleRelease` (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → versioned APKs + `mapping.txt` + checksums → provider release |
+| `development.yml` | daily schedule + push to main | canonical release flow (PART 13) on the `devel` variant → rolling `development` prerelease |
+| `beta.yml` | tag `*beta` | canonical release flow (PART 13) on the `release` variant → prerelease |
+| `release.yml` | tag `v*` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
 
-Creation order: security-only workflows first, `ci.yml`/`release.yml` last; every staged workflow passes `act --list -W {file}` before commit.
+Creation order: security-only workflows first, `ci.yml` and the channel workflows (`release.yml`, `beta.yml`, `development.yml`) last; every staged workflow passes `act --list -W {file}` before commit.
 
 ## Rules
 
@@ -911,9 +914,27 @@ Driven by `store_targets:` in IDEA.md. **Default: `fdroid, provider-releases`** 
 - **fdroid (default):** F-Droid section below.
 - **play (opt-in only):** adds `bundleRelease` AAB to `release.yml`, requires meeting Play's current target-SDK policy, and a data-safety form kept accurate in the repo (`metadata/play/`); Play inclusion never justifies adding Play Services to the app (PART 0).
 
+## Release channels — one canonical flow
+
+Every channel runs the same skeleton — only the context differs (trigger, tag, version identity, build variant, prerelease flag):
+
+build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapping.txt` → `version.txt` (version, commit id, build epoch) → source archive (`git archive` → `{project_name}-{version}-source.tar.gz`) → SBOM (CycloneDX Gradle plugin → `{project_name}-sbom.cdx.json`) → aggregate `sha256.txt` + `sha512.txt` over every staged asset, computed LAST — never per-artifact `.sha256` sidecars → provenance attestation of every asset (GitHub only) → publish provider release.
+
+| Channel | Workflow | Trigger | Tag | Version identity | Variant | Prerelease |
+|---|---|---|---|---|---|---|
+| stable | `release.yml` | tag push | `vX.Y.Z` | tag without `v` | `release` | no |
+| beta | `beta.yml` | tag push | `*beta` | tag as-is | `release` | yes |
+| development | `development.yml` | daily schedule + push to main | rolling `development` — release and tag deleted + recreated on every run | short commit id | `devel` | yes |
+
+- **No docker-image publishing in any channel** — this is an Android app; there is no runtime image to release. Builds still execute inside `casjaysdev/android:latest` (PART 4): that is the toolchain, not a release artifact.
+- The `devel` variant (PART 4) enables devel/debug features and the Debug Log; Logger sanitation (PART 6) applies in every variant.
+- Asset names are identical across channels — channel identity lives in the tag, the release object, and `version.txt`, never in mutated filenames.
+
 ## Versioning
 
 - Semver tags `vX.Y.Z`; `versionCode` monotonically increases (derive from semver: `X*10000 + Y*100 + Z` or maintain manually — pick once, record in IDEA.md).
+- Beta and development builds keep the in-tree `versionCode`/`versionName` — channel identity lives in the tag and `version.txt`, never in a mutated `versionCode`.
+- **`BUILD_EPOCH` is embedded in every build, local and CI** — captured once per build (`date -u +%s`) and exposed as a `BuildConfig` field; the `fdroidRelease` flavor pins it to the last-commit epoch (`git log -1 --format=%ct`) to stay reproducible.
 - Release notes generated from `CHANGELOG.md [Unreleased]`, which moves to a versioned section at tag time.
 
 ## Signing
@@ -926,6 +947,15 @@ Driven by `store_targets:` in IDEA.md. **Default: `fdroid, provider-releases`** 
 
 - Release builds: minify + shrinkResources ON; keep rules per reflective dependency (Room, serialization, crypto providers) in `proguard-rules.pro`, each rule commented with why.
 - `mapping.txt` uploaded as a release asset for crash de-obfuscation.
+
+## Play Protect & sideload warnings
+
+Sideloaded provider-release APKs can trigger a Play Protect "unsafe app blocked / app not verified" warning even when the app is completely clean: the heuristic flags R8-obfuscated APKs signed by a certificate Google has never seen with a low install base. This is inherent to sideloading a new app, not a defect to fix in code.
+
+- The remedy is certificate-identity consistency + time: sign every release with the same escrowed production keystore forever; the warning fades as the certificate accrues installs.
+- **Never disable R8/minification to appease the heuristic** — that trades a cosmetic warning for a real regression; the R8 rules above stay mandatory.
+- `mapping.txt` stays a release asset so obfuscated crash reports remain diagnosable.
+- F-Droid installs don't hit this path — F-Droid signs with its own key and users install through the F-Droid client.
 
 ## F-Droid (default target; skip only if removed from `store_targets`)
 
@@ -992,4 +1022,4 @@ version_code_scheme: ...  # semver-derived or manual
 # crash-reporting endpoint if the ACRA-style opt-in is used (PART 2)
 ```
 
-**Bootstrap order for a new app:** IDEA.md variables → PART 3 skeleton → PART 4 toolchain + `make check` green in Docker → PART 12 security workflows → first feature → `ci.yml`/`release.yml` last.
+**Bootstrap order for a new app:** IDEA.md variables → PART 3 skeleton → PART 4 toolchain + `make check` green in Docker → PART 12 security workflows → first feature → `ci.yml` and the channel workflows last.
