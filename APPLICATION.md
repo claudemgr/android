@@ -554,13 +554,13 @@ Resolve **current stable versions at bootstrap** (fetch, never guess) and record
 | JDK | 17 (temurin — `JAVA_HOME=/opt/jdk-17` in the toolchain image) |
 | compileSdk / targetSdk | current stable platform (a platform the toolchain image ships) |
 | minSdk | `{min_sdk}` (default 24) |
-| CMake / NDK (native projects only) | the versions baked into the toolchain image — pin the same in `app/build.gradle` |
+| CMake / NDK (native projects only) | the versions baked into the toolchain image (`$ANDROID_CMAKE_VERSION` / `$ANDROID_NDK_VERSION`) — pin the same in `app/build.gradle` |
 
 Version bumps are their own commits, verified with `make check` before anything else changes.
 
 ## Toolchain image — `casjaysdev/android:latest`
 
-All Android CI jobs and containerized builds use this maintained image by default. Built from `dockersrc/android` on the CasjaysDev debian base, it ships: Temurin JDK 17 (`JAVA_HOME=/opt/jdk-17`), the Android SDK at `/opt/android-sdk` (`ANDROID_HOME`/`ANDROID_SDK_ROOT`) with cmdline-tools, platform-tools, and pinned platforms, build-tools, `cmake`, and NDK baked in, a pre-warmed Gradle wrapper distribution (unpacked under `/root/.gradle`, `gradle` on `PATH`, `GRADLE_VERSION` exported), the GitHub CLI (`gh`) for release-managing jobs, and `git`/`curl`/`wget`/`unzip`/`gnupg` — CI jobs run inside the container and must never inline-install tools (PART 12). Tool versions are pinned as build ARGs in the image — discover them at runtime (`echo "$GRADLE_VERSION"`, `sdkmanager --list_installed`) instead of hardcoding, and align the project's Gradle wrapper, `compileSdk`, and NDK/CMake pins to what the image ships. Selection precedence (first match):
+All Android CI jobs and containerized builds use this maintained image by default. Built from `dockersrc/android` on the CasjaysDev debian base, it ships: Temurin JDK 17 (`JAVA_HOME=/opt/jdk-17`), the Android SDK at `/opt/android-sdk` (`ANDROID_HOME`/`ANDROID_SDK_ROOT`) with cmdline-tools, platform-tools, and pinned platforms, build-tools, `cmake`, and NDK baked in, a pre-warmed Gradle wrapper distribution (unpacked under `/root/.gradle`), the GitHub CLI (`gh`) for release-managing jobs, and `git`/`curl`/`wget`/`unzip`/`gnupg` — `gradle`, build-tools, `cmake`, and the NDK LLVM toolchain are all on `PATH`, and CI jobs run inside the container and must never inline-install tools (PART 12). Tool versions are pinned in the image and exported as env vars — discover them at runtime (`$GRADLE_VERSION`, `$ANDROID_BUILD_TOOLS_VERSION`, `$ANDROID_CMAKE_VERSION`, `$ANDROID_NDK_VERSION`; installed platforms via `sdkmanager --list_installed`) instead of hardcoding, and align the project's Gradle wrapper, `compileSdk`, and NDK/CMake pins to what the image ships. Selection precedence (first match):
 
 1. Image declared by the project in IDEA.md/SPEC.md/AI.md
 2. Project `docker/Dockerfile.build` if it exists (escape hatch below)
