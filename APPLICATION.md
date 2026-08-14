@@ -178,16 +178,16 @@ Load PARTs on demand with `grep -n "^# PART N" AI.md` — never read this file e
 | 2 | ANDROID APPLICATION MODEL | 423 |
 | 3 | PROJECT STRUCTURE | 481 |
 | 4 | TOOLCHAIN, BUILD & DOCKER | 543 |
-| 5 | STORAGE & DATABASE | 637 |
-| 6 | SECURITY & CRYPTO | 671 |
-| 7 | UI, THEMING, ACCESSIBILITY, I18N | 700 |
-| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 755 |
-| 9 | NETWORK & CONNECTIVITY | 788 |
-| 10 | BACKUP, RESTORE & SYNC | 819 |
-| 11 | TESTING & EMULATORS | 840 |
-| 12 | CI/CD WORKFLOWS | 867 |
-| 13 | RELEASE, SIGNING & F-DROID | 907 |
-| 14 | IDEA.md REFERENCE | 972 |
+| 5 | STORAGE & DATABASE | 640 |
+| 6 | SECURITY & CRYPTO | 674 |
+| 7 | UI, THEMING, ACCESSIBILITY, I18N | 703 |
+| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 758 |
+| 9 | NETWORK & CONNECTIVITY | 791 |
+| 10 | BACKUP, RESTORE & SYNC | 822 |
+| 11 | TESTING & EMULATORS | 843 |
+| 12 | CI/CD WORKFLOWS | 871 |
+| 13 | RELEASE, SIGNING & F-DROID | 912 |
+| 14 | IDEA.md REFERENCE | 977 |
 
 ---
 
@@ -260,7 +260,7 @@ Update these when their subject changes:
 - **ALWAYS keep `minSdk` working** — new dependencies must respect the project's `minSdk` or be guarded by `Build.VERSION.SDK_INT` checks
 - **ALWAYS keep the F-Droid flavor reproducible** (PART 13) — no non-deterministic codegen, no proprietary services, no network-fetching Gradle plugins
 - **ALWAYS use `Flow`/`StateFlow` for new reactive code** — never introduce LiveData, RxJava, or callback chains
-- **ALWAYS run `make check` before every commit** — compile + lint gate; never commit with errors or violations
+- **ALWAYS run `make check` before every commit** — compile + lint + JVM unit tests; never commit with errors, violations, or failing unit tests
 - **ALWAYS follow the commit workflow** in PART 1 — `gitcommit --dir {dir} all` is the only commit path
 - **ALWAYS update `CHANGELOG.md` in the same commit** as any user-visible behavior change
 
@@ -381,7 +381,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 
 | Goal | Command |
 |------|---------|
-| Compile-only + lint gate | `make check` |
+| Compile + lint + JVM unit-test gate | `make check` |
 | Debug APKs → `./binaries/` | `make build` |
 | Release APKs → `./releases/` (local verification only) | `make release` |
 | Unit tests | `make test` |
@@ -406,7 +406,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 ## Commit workflow (required on every commit)
 
 1. `git status --porcelain` + `git diff --stat` — see exactly what changed.
-2. **Run `make check`** — compile + lint; the mandatory pre-commit gate. Run `make test` when tests are touched or behavior changed.
+2. **Run `make check`** — compile + lint + device-free JVM unit tests; the mandatory pre-commit gate (instrumented tests need a device/emulator the build host generally lacks — that is why the gate is `check`, not `test`). Run `make test` when an emulator/device is reachable and the change touches security-critical code (crypto, storage, transport, exported components) — and always before tagging a release.
 3. **Changelog gate** — user-visible change ⇒ `CHANGELOG.md` (and the in-app what's-new asset if present) staged in the same commit.
 4. Write `.git/COMMIT_MESS` from the diff — every changed file described; never from memory.
 5. Re-read `COMMIT_MESS` against the diff; rewrite if anything is missing.
@@ -550,16 +550,17 @@ Resolve **current stable versions at bootstrap** (fetch, never guess) and record
 |---|---|
 | Kotlin | 2.x current stable |
 | Android Gradle Plugin | 8.x current stable |
-| Gradle | wrapper pinned, current stable for the AGP version |
-| JDK | 17 (temurin) |
-| compileSdk / targetSdk | current stable platform |
+| Gradle | wrapper pinned to the toolchain image's `GRADLE_VERSION` (compatible with the AGP version) |
+| JDK | 17 (temurin — `JAVA_HOME=/opt/jdk-17` in the toolchain image) |
+| compileSdk / targetSdk | current stable platform (a platform the toolchain image ships) |
 | minSdk | `{min_sdk}` (default 24) |
+| CMake / NDK (native projects only) | the versions baked into the toolchain image — pin the same in `app/build.gradle` |
 
 Version bumps are their own commits, verified with `make check` before anything else changes.
 
 ## Toolchain image — `casjaysdev/android:latest`
 
-All Android CI jobs and containerized builds use this maintained image by default: Android SDK + build-tools, Gradle, JDK 17, lint tooling pre-installed. Selection precedence (first match):
+All Android CI jobs and containerized builds use this maintained image by default. Built from `dockersrc/android` on the CasjaysDev debian base, it ships: Temurin JDK 17 (`JAVA_HOME=/opt/jdk-17`), the Android SDK at `/opt/android-sdk` (`ANDROID_HOME`/`ANDROID_SDK_ROOT`) with cmdline-tools, platform-tools, and pinned platforms, build-tools, `cmake`, and NDK baked in, a pre-warmed Gradle wrapper distribution (unpacked under `/root/.gradle`, `gradle` on `PATH`, `GRADLE_VERSION` exported), the GitHub CLI (`gh`) for release-managing jobs, and `git`/`curl`/`wget`/`unzip`/`gnupg` — CI jobs run inside the container and must never inline-install tools (PART 12). Tool versions are pinned as build ARGs in the image — discover them at runtime (`echo "$GRADLE_VERSION"`, `sdkmanager --list_installed`) instead of hardcoding, and align the project's Gradle wrapper, `compileSdk`, and NDK/CMake pins to what the image ships. Selection precedence (first match):
 
 1. Image declared by the project in IDEA.md/SPEC.md/AI.md
 2. Project `docker/Dockerfile.build` if it exists (escape hatch below)
@@ -603,10 +604,10 @@ ABI splits ON for release. Rename outputs with simplified arch tags:
 | Target | Effect | Output |
 |---|---|---|
 | `help` | list targets | stdout |
-| `check` | compile-only + lint inside Docker (fast gate) | stdout |
+| `check` | compile + lint + JVM unit tests inside Docker (fast, device-free gate) | stdout |
 | `build` | debug APKs inside Docker | `./binaries/` |
 | `release` | release APKs inside Docker (local verification only — real releases are CI) | `./releases/` |
-| `test` | unit tests inside Docker; UI tests if an emulator/device is reachable | report |
+| `test` | everything in `check` plus instrumented/UI tests when an emulator/device is reachable | report |
 | `install` | `adb install -r` universal APK (device path — skip when adb absent) | device |
 | `clean` | remove `.gradle/`, `app/build`, `binaries/` | — |
 
@@ -627,8 +628,10 @@ build:
 
 Rules:
 - Source tree → `/workspace`; Gradle cache → `GRADLE_USER_HOME=/workspace/.gradle` (project-scoped, safe for concurrent projects).
+- That override bypasses the image's pre-warmed wrapper dist at `/root/.gradle` — seed it once so `./gradlew` never re-downloads Gradle: `[ -d /workspace/.gradle/wrapper ] || cp -a /root/.gradle/wrapper /workspace/.gradle/` as the first step of the containerized command.
 - **Never volume-mount `/opt/android-sdk`** — it overlays the baked SDK. `ANDROID_HOME` is preset in the image.
 - `--rm --name {project_name}-XXXXXX` on every run; resource limits always set; never `-it` for batch commands.
+- Native (JNI/NDK) projects: `cmake`/`ndk` versions are pinned in `app/build.gradle` AND pre-baked into the toolchain image at those same versions — Gradle must never lazily download SDK components mid-build (nondeterministic, and corrupt mid-build `sdkmanager` downloads are a known CI flake).
 - In Makefiles use `$(PWD)`; in direct shell commands use `$PWD` (never `$(pwd)`).
 - Test-service containers (a test sshd, a mock API) run on an isolated named network `{project_name}-test-net`, torn down after tests.
 
@@ -843,12 +846,13 @@ Include only if the IDEA.md `## Applicability` matrix declares `backup_sync: yes
 
 | Layer | Location | Runs |
 |---|---|---|
-| Unit (JVM) | `app/src/test/` | every `make test`, every CI run |
+| Unit (JVM) | `app/src/test/` | every `make check` — and therefore every commit and every CI run |
 | Instrumented/UI | `app/src/androidTest/` | on emulator/device when reachable; release CI |
 | Migration tests | `app/src/androidTest/` + committed schemas | every Room version bump |
 
 - New behavior ships with a test that fails before and passes after.
 - Room migrations are tested with `MigrationTestHelper` against the committed schema JSON.
+- Instrumented tests are **required** — not best-effort — before tagging a release and for changes touching crypto, storage, transport, or exported components whenever an emulator/device is reachable (PART 1 commit workflow).
 
 ## Emulator management
 
@@ -888,6 +892,7 @@ Creation order: security-only workflows first, `ci.yml` and the channel workflow
 - TruffleHog secret scan on every push/PR.
 - OWASP DependencyCheck in `release.yml`; CVSS ≥ 7.0 fails; suppressions live in `config/dependency-check-suppressions.xml` with a reason comment per entry.
 - Custom security greps (e.g. hardcoded-password patterns) maintain their exclusion list in the workflow with a documented reason per exclusion — never delete an exclusion without checking why it exists.
+- Release-managing jobs that run inside the toolchain container (the `development.yml` rolling delete + recreate, asset uploads) use the provider CLI (`gh`/`glab`/`tea`) shipped in the image — never inline-installed in a step.
 - Renovate for dependency updates — never Dependabot.
 
 ## Post-Push CI Verification
