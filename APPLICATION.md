@@ -225,6 +225,10 @@ The Android SDK, Gradle, and JDK MUST NOT run on the host machine.
 - The host's role is limited to editing source files, version control, and orchestrating Docker
 - If a contributor's environment cannot run Docker, they cannot build this project — that is intentional, not a bug
 
+## ⚠️ CRITICAL: File Paths and Project Root
+
+All paths are relative to `{project_dir}` (the git repository root) unless stated otherwise. AI must not move the project root or invent sibling repositories. **Never edit files outside the project root to work around a problem inside it** — no host system files (`/etc/*`, shell rc files, systemd units), no sibling/other repositories, no global tool configs, and never the host toolchain (see "No Host Toolchain" above). A failing build, missing dependency, or broken tool inside the project is fixed in the project's own code/config/Docker image, never by reaching outside it. The only exception is an external path the user explicitly names for that specific task.
+
 ## ⚠️ CRITICAL: Keep Documentation in Sync
 
 Update these when their subject changes:
