@@ -979,6 +979,7 @@ build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapp
 
 - Semver tags `vX.Y.Z`; `versionCode` monotonically increases (derive from semver: `X*10000 + Y*100 + Z` or maintain manually — pick once, record in IDEA.md).
 - Beta and development builds keep the in-tree `versionCode`/`versionName` — channel identity lives in the tag and `version.txt`, never in a mutated `versionCode`.
+- **Short commit id** (development channel's version identity, `version.txt`): `git rev-parse --short=7 HEAD` — pin the explicit 7-char length; git's unpinned `--short HEAD` auto-abbreviates and grows past 7 chars as the repo's commit count increases, producing inconsistent-length ids across builds.
 - **`BUILD_EPOCH` is embedded in every build, local and CI** — captured once per build (`date -u +%s`) and exposed as a `BuildConfig` field; the `fdroidRelease` flavor pins it to the last-commit epoch (`git log -1 --format=%ct`) to stay reproducible.
 - Release notes generated from `CHANGELOG.md [Unreleased]`, which moves to a versioned section at tag time.
 
