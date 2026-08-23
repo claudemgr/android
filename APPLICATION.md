@@ -914,14 +914,24 @@ Provider-specific file locations and syntax: the matching `*_conventions.md` glo
 
 ## Workflow set
 
-| Workflow | Trigger | Job |
-|---|---|---|
-| `ci.yml` | push + PR to main | `make check`-equivalent: compile, lint, unit tests, structure/security validation |
-| `development.yml` | daily schedule + push to main | canonical release flow (PART 13) on the `devel` variant → rolling `development` prerelease |
-| `beta.yml` | tag `*beta` | canonical release flow (PART 13) on the `release` variant → prerelease |
-| `release.yml` | tag `v*` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
+Every project targets all five CI/CD providers — same gates, different syntax, zero vendor lock-in. No `build-toolchain.yml` equivalent on any provider (`casjaysdev/android:latest` is maintained externally, see above).
 
-Creation order: security-only workflows first, `ci.yml` and the channel workflows (`release.yml`, `beta.yml`, `development.yml`) last; every staged workflow passes `act --list -W {file}` before commit.
+| Provider | Workflow location | Syntax / runner |
+|----------|------------------|-----------------|
+| GitHub | `.github/workflows/*.yml` | GitHub Actions |
+| GitLab | `.gitlab-ci.yml` (stages: build, test, security, release) | GitLab CI |
+| Gitea | `.gitea/workflows/*.yml` | GitHub Actions (act runner) |
+| Forgejo | `.forgejo/workflows/*.yml` | GitHub Actions (act runner) |
+| Jenkins | `Jenkinsfile` (parallel stages: Build / Test / Security / Release) | Declarative Pipeline |
+
+| Gate | GitHub | GitLab | Gitea / Forgejo | Jenkins | Trigger | Job |
+|---|---|---|---|---|---|---|
+| CI | `ci.yml` | `build` + `test` + `security` stages | `ci.yml` | `Build` + `Test` + `Security` stages | push + PR to main | `make check`-equivalent: compile, lint, unit tests, structure/security validation |
+| Development | `development.yml` | `development` stage (schedule + push-triggered) | `development.yml` | `Development` stage (schedule + push-triggered) | daily schedule + push to main | canonical release flow (PART 13) on the `devel` variant → rolling `development` prerelease |
+| Beta | `beta.yml` | `beta` stage (tag-triggered) | `beta.yml` | `Beta` stage (tag-triggered) | tag `*beta` | canonical release flow (PART 13) on the `release` variant → prerelease |
+| Release | `release.yml` | `release` stage (tag-triggered) | `release.yml` | `Release` stage (tag-triggered) | tag `v*` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
+
+Creation order: security-only workflows first, `ci.yml` and the channel workflows (`release.yml`, `beta.yml`, `development.yml`) last; every staged workflow passes `act --list -W {file}` before commit (GitHub Actions-syntax providers only — GitLab and Jenkins have no `act` equivalent, validate those with their own native lint: `gitlab-ci-lint` / Jenkins `Pipeline Linter`).
 
 ## Rules
 
