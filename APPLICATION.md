@@ -511,6 +511,7 @@ Every non-trivial user flow (onboarding, primary task, import/export) is documen
 │   ├── Dockerfile                # optional runtime/CI helpers — NOT a toolchain image
 │   └── docker-compose.yml        # optional test-service containers
 ├── scripts/                      # build/install/emulator/release helpers
+├── deps/                         # optional: committed, project-specific support files not part of the build/release output (e.g. scripts or Dockerfiles for building a dependency) — never a cache or temp/output dir
 ├── metadata/                     # F-Droid metadata ({app_id}.yml)
 ├── binaries/                     # debug APK output (gitignored)
 ├── releases/                     # release APK output (gitignored)
