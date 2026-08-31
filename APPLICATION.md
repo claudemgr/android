@@ -314,7 +314,7 @@ Update these when their subject changes:
 
 ## Device access reality
 
-The development device, when one exists, is typically remote or absent. **Assume adb/USB is unavailable**: prefer the emulator path (PART 11) or treat the build artifact (APK) as the deliverable. Never block a task waiting for a physical device.
+**AI/adb never has access to the user's physical device** — the development device, when one exists, is typically remote or absent. **Assume adb/USB is unavailable**: use an AVD (PART 11) where the system supports it, or treat the build artifact (APK) as the deliverable. Never block a task waiting for a physical device.
 
 ## Licensing & Attribution
 
