@@ -181,13 +181,13 @@ Load PARTs on demand with `grep -n "^# PART N" AI.md` — never read this file e
 | 5 | STORAGE & DATABASE | 658 |
 | 6 | SECURITY & CRYPTO | 693 |
 | 7 | UI, THEMING, ACCESSIBILITY, I18N | 722 |
-| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 812 |
-| 9 | NETWORK & CONNECTIVITY | 845 |
-| 10 | BACKUP, RESTORE & SYNC | 876 |
-| 11 | TESTING & EMULATORS | 898 |
-| 12 | CI/CD WORKFLOWS | 926 |
-| 13 | RELEASE, SIGNING & F-DROID | 978 |
-| 14 | IDEA.md REFERENCE | 1086 |
+| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 925 |
+| 9 | NETWORK & CONNECTIVITY | 958 |
+| 10 | BACKUP, RESTORE & SYNC | 989 |
+| 11 | TESTING & EMULATORS | 1011 |
+| 12 | CI/CD WORKFLOWS | 1039 |
+| 13 | RELEASE, SIGNING & F-DROID | 1091 |
+| 14 | IDEA.md REFERENCE | 1199 |
 
 ---
 
@@ -727,6 +727,90 @@ Offer per-credential persistence levels where secrets are cached:
 - Never hardcode colors: theme attributes + a central theme definition. If the app has user-selectable themes, model them as a data class (name, isDark, semantic colors, optional palette) with a `ThemeManager` exposing the current theme as `StateFlow`.
 - Contrast validation for user-created/custom themes: WCAG 2.1 AA (4.5:1) minimum, AAA (7:1) advisory; surface issues in the theme editor in real time.
 
+### Color tokens → Material 3 `ColorScheme`
+
+The canonical design tokens (`~/.claude/memory/ui_ux_conventions.md` → Design Token System) are the single source for every hex value in this app. Build `lightColorScheme()`/`darkColorScheme()` from them — never invent a parallel palette:
+
+| Token | Material 3 role | Dark hex | Light hex |
+|-------|-----------------|----------|-----------|
+| `--bg` | `background` / `surface` | `#282a36` | `#ffffff` |
+| `--bg-subtle` | `surfaceVariant` | `#21222c` | `#f6f8fa` |
+| `--bg-elevated` | `surfaceContainer` | `#2b2d3a` | `#ffffff` |
+| `--bg-overlay` | `surfaceContainerHigh` | `#343746` | `#ffffff` |
+| `--bg-inset` | `surfaceContainerHighest` | `#1e1f29` | `#eaeef2` |
+| `--fg` | `onBackground` / `onSurface` | `#f8f8f2` | `#1f2328` |
+| `--fg-muted` | `onSurfaceVariant` | `#a3a9cc` | `#636c76` |
+| `--fg-disabled` | `outline` | `#565f89` | `#adb5c0` |
+| `--border` | `outlineVariant` | `#44475a` | `#d0d7de` |
+| `--accent` | `primary` | `#bd93f9` | `#0969da` |
+| `--accent-subtle` | `primaryContainer` | `#3d3a5c` | `#ddf4ff` |
+| `--accent-fg` | `onPrimaryContainer` | `#bd93f9` | `#0969da` |
+| `--fg-on-accent` | `onPrimary` | `#282a36` | `#ffffff` |
+| `--color-error-fg` | `error` | `#ff5555` | `#d1242f` |
+| `--color-error-bg` | `errorContainer` | `#2e1616` | `#ffebe9` |
+| `--color-success-fg` / `--color-warning-fg` / `--color-info-fg` | no stock M3 role — extended custom roles, see below | — | — |
+
+```kotlin
+// Material 3 ships no success/warning/info roles - extend the scheme with a
+// second CompositionLocal instead of hardcoding a Color literal at any call site.
+data class ExtendedColors(
+    val successFg: Color, val successBg: Color, val successBorder: Color,
+    val warningFg: Color, val warningBg: Color, val warningBorder: Color,
+    val infoFg: Color, val infoBg: Color, val infoBorder: Color,
+)
+
+val LocalExtendedColors = staticCompositionLocalOf<ExtendedColors> {
+    error("ExtendedColors not provided - wrap content in AppTheme")
+}
+
+@Composable
+fun AppTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    val colorScheme = if (darkTheme) {
+        darkColorScheme(
+            background = Color(0xFF282A36), surface = Color(0xFF282A36),
+            onBackground = Color(0xFFF8F8F2), onSurface = Color(0xFFF8F8F2),
+            surfaceVariant = Color(0xFF21222C), onSurfaceVariant = Color(0xFFA3A9CC),
+            primary = Color(0xFFBD93F9), onPrimary = Color(0xFF282A36),
+            primaryContainer = Color(0xFF3D3A5C), onPrimaryContainer = Color(0xFFBD93F9),
+            error = Color(0xFFFF5555), errorContainer = Color(0xFF2E1616), onErrorContainer = Color(0xFFFF5555),
+            outline = Color(0xFF565F89), outlineVariant = Color(0xFF44475A),
+        )
+    } else {
+        lightColorScheme(
+            background = Color(0xFFFFFFFF), surface = Color(0xFFFFFFFF),
+            onBackground = Color(0xFF1F2328), onSurface = Color(0xFF1F2328),
+            surfaceVariant = Color(0xFFF6F8FA), onSurfaceVariant = Color(0xFF636C76),
+            primary = Color(0xFF0969DA), onPrimary = Color(0xFFFFFFFF),
+            primaryContainer = Color(0xFFDDF4FF), onPrimaryContainer = Color(0xFF0969DA),
+            error = Color(0xFFD1242F), errorContainer = Color(0xFFFFEBE9), onErrorContainer = Color(0xFFD1242F),
+            outline = Color(0xFFADB5C0), outlineVariant = Color(0xFFD0D7DE),
+        )
+    }
+    val extendedColors = if (darkTheme) {
+        ExtendedColors(
+            successFg = Color(0xFF50FA7B), successBg = Color(0xFF16281D), successBorder = Color(0xFF2FA855),
+            warningFg = Color(0xFFFFB86C), warningBg = Color(0xFF2E2113), warningBorder = Color(0xFFD68F3E),
+            infoFg = Color(0xFF8BE9FD), infoBg = Color(0xFF16282A), infoBorder = Color(0xFF4FC4DC),
+        )
+    } else {
+        ExtendedColors(
+            successFg = Color(0xFF1A7F37), successBg = Color(0xFFDAFBE1), successBorder = Color(0xFF82CFB0),
+            warningFg = Color(0xFF9A6700), warningBg = Color(0xFFFFF8C5), warningBorder = Color(0xFFD4A72C),
+            infoFg = Color(0xFF0969DA), infoBg = Color(0xFFDDF4FF), infoBorder = Color(0xFF54AEFF),
+        )
+    }
+    CompositionLocalProvider(LocalExtendedColors provides extendedColors) {
+        MaterialTheme(colorScheme = colorScheme, content = content)
+    }
+}
+```
+
+Rules:
+- `MaterialTheme.colorScheme` is the only source for standard roles; `LocalExtendedColors.current` is the only source for success/warning/info — never a literal `Color(0x...)` at a call site (Reuse Before Creating → Styling, below).
+- Dynamic Color (Material You, Android 12+) is opt-in per IDEA.md `## Applicability`; when enabled it overrides `primary`/`primaryContainer` from the user's wallpaper, and the token table above becomes the fallback for API < 31 or when the user disables Dynamic Color in-app.
+- `--accent-hover`/`--accent-pressed` have no static Compose equivalent — implement via `Modifier.indication`/state-layer opacity over `primary` per Material 3 interaction states, never a second hardcoded color.
+- Views-toolkit apps: the same hex values go into `res/values/colors.xml` + `res/values-night/colors.xml`, referenced from a `Theme.Material3.*` XML theme — the token table is the source of truth regardless of toolkit.
+
 ## Reuse Before Creating
 
 **Before writing new code for anything — a function, a variable/constant, or a UI component/style — check whether an equivalent already exists in the project and reuse or extend it. Only create something new when nothing existing covers the need.** This is a general project-wide rule; it governs every artifact type and is not restricted to any one feature.
@@ -799,6 +883,7 @@ This rule governs the entire spec — it is not restricted to the Theming sectio
 - **views:** one layout per screen; shared row items as `item_*.xml`; dialogs as `dialog_*.xml`.
 - **compose:** one screen-level composable per destination; shared row items as reusable composables; dialogs as `*Dialog` composables.
 - No pixel literals for spacing — dimension resources (views) or a central spacing/dimension token object (compose).
+- Safe areas: respect status bar, navigation bar, cutout/notch, and gesture-nav insets via `WindowInsets`/`Scaffold` content padding (compose) or `ViewCompat.setOnApplyWindowInsetsListener` (views) — content never draws under system chrome unless the screen intentionally goes edge-to-edge with a contrast-safe scrim behind the chrome.
 
 ## Form factors
 
@@ -806,6 +891,34 @@ This rule governs the entire spec — it is not restricted to the Theming sectio
 - Additional targets declared in IDEA.md: `wear` · `tv` · `auto` · `widget`.
 - Each extra factor gets its own Gradle module (PART 0 → Identity); note the differences: wear (min SDK 26+, rotary/ambient input), tv (leanback/D-pad navigation, no touch assumption), auto (templated UI only), widget (Glance for compose apps, RemoteViews for views apps).
 - Never gate the phone app's features on a companion factor being installed.
+
+## Content & Feedback States
+
+- **No placeholder content** — every screen ships with real, functional content; no "Coming soon" screens, and no empty state without a meaningful message plus a clear next action.
+- **Every state handled** — loading, empty, error, and success each get a distinct, informative UI; a bare spinner or a blank screen is never the final state for an error.
+- **Feedback for every action** — button press, form submit, background work request: the user always sees something changed (loading indicator, `Snackbar`, state transition) — no silent no-ops.
+
+## Dynamic Interaction
+
+- **Gestures** — swipe-to-dismiss (`SwipeToDismissBox`), pull-to-refresh (`PullToRefreshBox`), swipe actions on list rows; every gesture ships with a visible non-gesture equivalent (button/menu item) — never gesture-only.
+- **Haptics** — `HapticFeedback`/`View.performHapticFeedback()` on confirm, delete, and drag-reorder; respect the system haptics toggle, never force-vibrate when the user has disabled it.
+- **Animations & Transitions** — Compose `animate*AsState`/`AnimatedVisibility`/shared-element transitions for navigation; respect the "Remove animations" accessibility setting (`Settings.Global.ANIMATOR_DURATION_SCALE == 0`) by skipping or shortening animations.
+- **Custom Keyboards & Input Extensions** — standard `IME`/`KeyboardOptions` only unless IDEA.md declares a custom input method; never intercept system keyboard shortcuts.
+- **Dynamic Layout Adaptation** — `WindowSizeClass` breakpoints drive layout (list-detail on expanded width, single-pane on compact) — the same rule as Form factors above, applied at the composable level, not only the module level.
+- **Scroll Behavior** — `TopAppBarScrollBehavior` for collapsing headers; `LazyListState`/`rememberSaveable` to restore scroll position across navigation and process death.
+- **Context Menus & Drag-and-Drop** — long-press `ContextMenu`/`DropdownMenu` for secondary actions; drag handles for reorderable lists; always keep a non-drag reorder path (move up/down menu items) for accessibility.
+- **State Persistence Across Interruptions** — `rememberSaveable` for UI-local state, `SavedStateHandle` in ViewModels for process death; never lose in-progress form input to a rotation or a backgrounding.
+- **Focus Management** — logical focus order via `Modifier.focusOrder`/`focusRequester`; focus returns to a sensible target after a dialog/sheet closes, never left on a now-gone element.
+- **Toast / Snackbar / Banner** — transient confirmations via `SnackbarHost` (compose) or `Snackbar` (views); reserve `Toast` for fire-and-forget system-level messages only; persistent or actionable warnings use an in-layout banner, not a toast.
+- **Bottom Sheets & Modal Presentation** — `ModalBottomSheet` for secondary flows that shouldn't lose the underlying screen's context; a full-screen `Dialog`/navigation destination for anything requiring undivided attention.
+- **Popovers & Tooltips** — `PlainTooltip`/`RichTooltip` for supplementary info only; never for content required to complete the primary task.
+- **Selection Mode & Multi-select** — contextual action mode (top app bar swaps to selection count + actions) on long-press; selection state visible for every item in selection mode, not just the interacted one.
+- **Undo & Redo** — destructive-but-reversible actions (delete, archive) surface a `Snackbar` with an `Undo` action before the change is finalized; reserve a confirmation dialog for genuinely irreversible actions only.
+- **Offline & Network-aware UI** — see PART 9 "Offline-first"; connectivity state surfaces as a persistent, non-blocking banner, never a modal dialog.
+- **Pointer & Hover Adaptation** — Chromebook/tablet-with-mouse and stylus hover states (`PointerIcon`, hover elevation) enhance but never gate functionality that must also work via touch.
+- **Voice Input** — `SpeechRecognizer`/`RecognizerIntent` as an alternative input method for text fields where declared in IDEA.md; never the only way to enter required data.
+- **Stylus & Pen Input** — low-latency ink via stylus `MotionEvent` data where the app supports drawing/annotation; pressure/tilt are enhancements, never required for basic use.
+- **Biometric Authentication Overlay** — `BiometricPrompt` for app-lock/sensitive-action gating; always ship a device-credential (PIN/pattern/password) fallback — biometric-only lockout is never acceptable.
 
 ---
 
