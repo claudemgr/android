@@ -174,20 +174,20 @@ Load PARTs on demand with `grep -n "^# PART N" AI.md` — never read this file e
 | PART | Title | ~Line |
 |------|-------|-------|
 | 0 | CRITICAL RULES - READ FIRST | 194 |
-| 1 | PROJECT FILES & GOVERNANCE | 330 |
-| 2 | ANDROID APPLICATION MODEL | 436 |
-| 3 | PROJECT STRUCTURE | 494 |
-| 4 | TOOLCHAIN, BUILD & DOCKER | 559 |
-| 5 | STORAGE & DATABASE | 658 |
-| 6 | SECURITY & CRYPTO | 693 |
-| 7 | UI, THEMING, ACCESSIBILITY, I18N | 722 |
-| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 925 |
-| 9 | NETWORK & CONNECTIVITY | 958 |
-| 10 | BACKUP, RESTORE & SYNC | 989 |
-| 11 | TESTING & EMULATORS | 1011 |
-| 12 | CI/CD WORKFLOWS | 1039 |
-| 13 | RELEASE, SIGNING & F-DROID | 1091 |
-| 14 | IDEA.md REFERENCE | 1199 |
+| 1 | PROJECT FILES & GOVERNANCE | 341 |
+| 2 | ANDROID APPLICATION MODEL | 447 |
+| 3 | PROJECT STRUCTURE | 505 |
+| 4 | TOOLCHAIN, BUILD & DOCKER | 570 |
+| 5 | STORAGE & DATABASE | 669 |
+| 6 | SECURITY & CRYPTO | 704 |
+| 7 | UI, THEMING, ACCESSIBILITY, I18N | 733 |
+| 8 | NOTIFICATIONS, SERVICES, BACKGROUND WORK | 936 |
+| 9 | NETWORK & CONNECTIVITY | 969 |
+| 10 | BACKUP, RESTORE & SYNC | 1000 |
+| 11 | TESTING & EMULATORS | 1022 |
+| 12 | CI/CD WORKFLOWS | 1050 |
+| 13 | RELEASE, SIGNING & F-DROID | 1102 |
+| 14 | IDEA.md REFERENCE | 1210 |
 
 ---
 
@@ -260,6 +260,17 @@ Update these when their subject changes:
 | Store targets | `{store_targets}` — default **fdroid + provider releases** (GitHub/GitLab/Gitea/Forgejo releases per git remote); **Play is opt-in** via IDEA.md (PART 13) |
 | Module layout | Single `app/` Gradle module unless IDEA.md declares otherwise (Wear/TV companions get their own module) |
 
+## Kotlin Style & Idioms
+
+- **Style & lint**: `ktlint` (official Kotlin code style) formats every file; `detekt` runs in `make check` for static analysis (complexity, unused code, magic numbers) — both gate every commit, the Kotlin equivalent of `go-lint`/`rust-lint` for this project.
+- **Null safety**: `!!` is forbidden outside test code — use safe calls (`?.`), the elvis operator (`?:`), or `requireNotNull()`/`checkNotNull()` with a message. Platform types from Java interop are wrapped/annotated at the boundary, never leaked raw into app code.
+- **Immutability first**: `val` over `var`; data classes carry no `var` properties unless the object is genuinely mutable state; expose read-only `List`/`Map`/`Set` outside the owning scope, keep `Mutable*` variants private to it.
+- **Structured concurrency**: never `GlobalScope.launch` — every coroutine is scoped to `viewModelScope`, `lifecycleScope`, or an explicit `CoroutineScope` tied to a component's lifecycle and cancelled with it. Long-running background work uses `WorkManager` (PART 8), never a detached coroutine.
+- **State modeling**: `sealed class`/`sealed interface` for UI/domain state (`Loading`/`Success`/`Error`, not a nullable value plus a boolean flag) — `when` over a sealed hierarchy stays exhaustive; no `else` branch that would silently swallow a future new case.
+- **Visibility**: `private`/`internal` by default; a member is `public` only when it is genuinely part of the module's external API.
+- **Scope functions**: `let`/`run`/`with`/`apply`/`also` used for their idiomatic purpose (null-check unwrap, object configuration, side effects) — never chained more than two deep, and never used to smuggle multi-statement logic into what reads like a one-liner.
+- **Naming**: standard Kotlin conventions — `UpperCamelCase` types, `lowerCamelCase` members/functions, `SCREAMING_SNAKE_CASE` top-level/companion `const val`s; no Hungarian notation, no `m`/`s` prefixes.
+
 ## ALWAYS DO
 
 - **ALWAYS resolve placeholders from `IDEA.md ## Project variables`** — `AI.md` is read-only; never edit placeholders in place
@@ -272,7 +283,7 @@ Update these when their subject changes:
 - **ALWAYS keep `minSdk` working** — new dependencies must respect the project's `minSdk` or be guarded by `Build.VERSION.SDK_INT` checks
 - **ALWAYS keep the F-Droid flavor reproducible** (PART 13) — no non-deterministic codegen, no proprietary services, no network-fetching Gradle plugins
 - **ALWAYS use `Flow`/`StateFlow` for new reactive code** — never introduce LiveData, RxJava, or callback chains
-- **ALWAYS run `make check` before every commit** — compile + lint + JVM unit tests; never commit with errors, violations, or failing unit tests
+- **ALWAYS run `make check` before every commit** — compile + `ktlint`/`detekt` lint + JVM unit tests; never commit with errors, violations, or failing unit tests
 - **ALWAYS follow the commit workflow** in PART 1 — `gitcommit --dir {dir} all` is the only commit path
 - **ALWAYS update `CHANGELOG.md` in the same commit** as any user-visible behavior change
 
@@ -419,7 +430,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 ## Commit workflow (required on every commit)
 
 1. `git status --porcelain` + `git diff --stat` — see exactly what changed.
-2. **Run `make check`** — compile + lint + device-free JVM unit tests; the mandatory pre-commit gate (instrumented tests need a device/emulator the build host generally lacks — that is why the gate is `check`, not `test`). Run `make test` when an emulator/device is reachable and the change touches security-critical code (crypto, storage, transport, exported components) — and always before tagging a release.
+2. **Run `make check`** — compile + `ktlint`/`detekt` lint (PART 0 → Kotlin Style & Idioms) + device-free JVM unit tests; the mandatory pre-commit gate (instrumented tests need a device/emulator the build host generally lacks — that is why the gate is `check`, not `test`). Run `make test` when an emulator/device is reachable and the change touches security-critical code (crypto, storage, transport, exported components) — and always before tagging a release.
 3. **Changelog gate** — user-visible change ⇒ `CHANGELOG.md` (and the in-app what's-new asset if present) staged in the same commit.
 4. Write `.git/COMMIT_MESS` from the diff — every changed file described; never from memory.
 5. Re-read `COMMIT_MESS` against the diff; rewrite if anything is missing.
@@ -621,7 +632,7 @@ ABI splits ON for release. Rename outputs with simplified arch tags:
 | Target | Effect | Output |
 |---|---|---|
 | `help` | list targets | stdout |
-| `check` | compile + lint + JVM unit tests inside Docker (fast, device-free gate) | stdout |
+| `check` | compile + `ktlint`/`detekt` lint + JVM unit tests inside Docker (fast, device-free gate) | stdout |
 | `build` | debug APKs inside Docker | `./binaries/` |
 | `release` | release APKs inside Docker (local verification only — real releases are CI) | `./releases/` |
 | `test` | everything in `check` plus instrumented/UI tests when an emulator/device is reachable | report |
