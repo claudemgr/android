@@ -1090,10 +1090,10 @@ Every project targets all five CI/CD providers — same gates, different syntax,
 
 | Gate | GitHub | GitLab | Gitea / Forgejo | Jenkins | Trigger | Job |
 |---|---|---|---|---|---|---|
-| CI | `ci.yml` | `build` + `test` + `security` stages | `ci.yml` | `Build` + `Test` + `Security` stages | push + PR to main | `make check`-equivalent: compile, lint, unit tests, structure/security validation |
-| Development | `development.yml` | `development` stage (schedule + push-triggered) | `development.yml` | `Development` stage (schedule + push-triggered) | daily schedule + push to main | canonical release flow (PART 13) on the `devel` variant → rolling `development` prerelease |
-| Beta | `beta.yml` | `beta` stage (tag-triggered) | `beta.yml` | `Beta` stage (tag-triggered) | tag `*beta` | canonical release flow (PART 13) on the `release` variant → prerelease |
-| Release | `release.yml` | `release` stage (tag-triggered) | `release.yml` | `Release` stage (tag-triggered) | tag `v*` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
+| CI | `ci.yml` | `build` + `test` + `security` stages | `ci.yml` | `Build` + `Test` + `Security` stages | push + PR to main + `workflow_dispatch` | `make check`-equivalent: compile, lint, unit tests, structure/security validation |
+| Development | `development.yml` | `development` stage (schedule + push-triggered) | `development.yml` | `Development` stage (schedule + push-triggered) | daily schedule + push to main + `workflow_dispatch` | canonical release flow (PART 13) on the `devel` variant → rolling `development` prerelease |
+| Beta | `beta.yml` | `beta` stage (tag-triggered) | `beta.yml` | `Beta` stage (tag-triggered) | tag `*beta` + `workflow_dispatch` | canonical release flow (PART 13) on the `release` variant → prerelease |
+| Release | `release.yml` | `release` stage (tag-triggered) | `release.yml` | `Release` stage (tag-triggered) | tag `v*` + `workflow_dispatch` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
 
 **Container-job user rule:** every GitHub Actions-syntax `container:` job (e.g. `container: image: casjaysdev/android:latest`) MUST set `options: "--user 0:0"`. The runner (and actions/checkout's post-job cleanup) execs into the job container — e.g. `cat /etc/*release` for OS diagnostics — as a user the image's `/etc/passwd` may not define, which fails or flakes the job after all real work already passed. Numeric `0:0` needs no `/etc/passwd` lookup, so it is immune regardless of the image's user table.
 
