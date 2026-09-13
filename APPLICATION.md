@@ -482,6 +482,7 @@ Both: never mix toolkits within a screen; a views→compose migration is increme
 - Show rationale UI (`shouldShowRequestPermissionRationale`) before re-asking; after permanent denial, offer a settings deep link — never loop the prompt.
 - Every feature has a **graceful denial path**: the app stays usable, the dependent feature is disabled with a clear message.
 - Every permission in the manifest is justified in IDEA.md; remove permissions when the feature is removed. Never request a broad permission when a narrow API exists (SAF over storage, photo picker over `READ_MEDIA_*`).
+- **File-manager-class exception:** when the app's *core, declared feature* is unrestricted filesystem access — a file manager, a local SFTP/FTP/WebDAV server or browser, a sync client, a backup tool — SAF is not a narrower API, it is the wrong tool: it forces a per-tree user grant, hides `Android/data`/`Android/obb`, and blocks arbitrary path navigation, system-wide search, and cross-tree move/copy that the feature requires. For that class of app, `MANAGE_EXTERNAL_STORAGE` is the correct, narrowest-available API for the stated feature, not a broad-permission shortcut around one — request it lazily (only when the file-manager-class feature is opened, not at app start), with a rationale screen before the `ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION` settings intent, exactly like any other runtime permission above. Below API 30, fall back to legacy `READ_EXTERNAL_STORAGE`/`WRITE_EXTERNAL_STORAGE` + `requestLegacyExternalStorage`, since `MANAGE_EXTERNAL_STORAGE` doesn't exist pre-Android 11. This permission depends on nothing from Play Services — it's a plain AOSP/Settings-app grant — so it carries no conflict with the no-Play-Services rule and no F-Droid anti-feature (Google's own Play policy separately carves out "file manager whose core function is broad file access" as a named legitimate use, which is informative precedent, not the compliance gate here). Still complement it with SAF for cross-app "share/open with" flows, since other apps' pickers expect SAF URIs, not raw paths.
 
 ## Crash reporting
 
@@ -696,7 +697,7 @@ The Room/database sections apply only if the IDEA.md `## Applicability` matrix d
 
 ## Files
 
-- App-private storage by default; SAF (`ACTION_OPEN_DOCUMENT` / `ACTION_CREATE_DOCUMENT`) for anything user-visible — never request broad storage permissions.
+- App-private storage by default; SAF (`ACTION_OPEN_DOCUMENT` / `ACTION_CREATE_DOCUMENT`) for anything user-visible — never request broad storage permissions, except the file-manager-class exception in "Runtime permissions" above (PART 3) when unrestricted filesystem access is the app's core declared feature.
 - Exported files use documented, versioned formats (JSON with a `version` field, or ZIP with a manifest).
 
 ---
