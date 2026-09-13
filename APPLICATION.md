@@ -293,7 +293,7 @@ Update these when their subject changes:
 - **NEVER write inline comments** — comments go above the code, single line, ≤180 chars. Two exceptions only: tool-required same-line directives (`@Suppress`, `// noinspection`), and CI workflow SHA-pin version annotations (`uses: owner/action@{40-char-sha}  # vX.Y.Z`), which Renovate reads and rewrites in place and must never be moved above the `uses:` line
 - **NEVER put comments in pure data formats** — no comments in `.json` (including `google-services.json`-style configs), `.env`/`KEY=VALUE` files, or CSV/TSV; document those in markdown instead. Gradle/Kotlin/XML/YAML take comments normally, above the line
 - **NEVER commit secrets** — no keystores of any kind, no tokens, no API keys; a dev `keystore.jks` is permitted only as a locally generated, gitignored, never-committed artifact documented as dev-only
-- **NEVER pull in Google Play Services** unless IDEA.md explicitly requires it — default target includes de-Googled ROMs; prefer pure-JVM/AOSP alternatives (e.g. ZXing over ML Kit)
+- **NEVER pull in Google Play Services** unless IDEA.md explicitly requires it — prefer pure-JVM/AOSP alternatives (e.g. ZXing over ML Kit). This is a design goal, not a checkbox: no-Play-Services plus F-Droid compliance (PART 13) together mean the app installs and fully functions on **any and all ROMs** — stock, de-Googled (GrapheneOS, CalyxOS, /e/, LineageOS without microG), and vendor forks alike — with zero feature loss and no silent GMS fallback. Every carve-out and API choice elsewhere in this spec is held to that same bar: plain AOSP/Android SDK APIs only, never something that degrades or breaks on a ROM without GMS installed.
 - **NEVER create a `docker/Dockerfile.build` by default** — `casjaysdev/android:latest` covers virtually every need; escape hatch in PART 4
 - **NEVER volume-mount over `/opt/android-sdk`** in the build container — it overlays the baked SDK
 - **NEVER reimplement what a chosen library owns** — compose existing libraries; don't fork the wheel
@@ -981,6 +981,7 @@ Apply only the sections the IDEA.md `## Applicability` matrix declares (`notific
 | `mediaPlayback` | Audio/video playback | Media3 ExoPlayer + `MediaSessionService`; media-style notification driven by the session — never a hand-built one |
 | `location` | Active tracking the user started | Visible indicator; stop control always present |
 | `camera` / `microphone` | Active capture | While-in-use permission rules apply |
+| `mediaProjection` | Screen capture/recording (session/screen recorders) | Android 14+ requires this declared type + `FOREGROUND_SERVICE_MEDIA_PROJECTION`; per-session `MediaProjectionManager` consent dialog, never persisted/skipped, re-shown every time capture starts. Plain AOSP `MediaProjection` API — no Play Services dependency, no F-Droid anti-feature |
 - Auto-stop within a 30-second grace period after the last unit of work completes (`stopSelf()` from a `Handler.postDelayed`/`WorkManager` one-shot check) — a new unit of work arriving within that window cancels the pending stop; document a different value in IDEA.md only when the use case genuinely needs one.
 - Every ongoing notification carries a direct action (stop/disconnect/cancel) — confirmation via a transparent dialog activity if destructive.
 
