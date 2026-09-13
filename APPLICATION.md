@@ -1007,7 +1007,6 @@ Include only if the IDEA.md `## Applicability` matrix declares `network: yes`.
 
 - TLS trust per PART 6: TOFU with explicit user confirmation on change; never trust-all.
 - Cleartext traffic forbidden: `networkSecurityConfig` with `cleartextTrafficPermitted="false"`; a per-host dev exception is debug-variant only.
-- **Local-network-class exception:** when the app's *core, declared feature* is discovering or managing devices on the local network — an SMB/DLNA/UPnP browser, a printer or IoT device manager, a local NAS client, a network scanner — the peers it must reach often speak plaintext protocols with no TLS option at all, which TOFU (for unverified-but-present certs) doesn't help with. For that class of app, scope the `networkSecurityConfig` cleartext exception to private/link-local IP ranges only (RFC 1918 + link-local, never a wildcard, never a public-internet domain) and document the specific ranges/protocols in IDEA.md; internet-facing traffic from the same app still goes through the TLS/TOFU path above unchanged.
 - Certificate pinning is optional and per-host, with a documented rotation plan (backup pin) — never pin without one.
 
 ## Offline-first
