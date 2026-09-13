@@ -1007,6 +1007,7 @@ Include only if the IDEA.md `## Applicability` matrix declares `network: yes`.
 
 - TLS trust per PART 6: TOFU with explicit user confirmation on change; never trust-all.
 - Cleartext traffic forbidden: `networkSecurityConfig` with `cleartextTrafficPermitted="false"`; a per-host dev exception is debug-variant only.
+- **Local-network-class exception:** when the app's *core, declared feature* is discovering or managing devices on the local network — an SMB/DLNA/UPnP browser, a printer or IoT device manager, a local NAS client, a network scanner — the peers it must reach often speak plaintext protocols with no TLS option at all, which TOFU (for unverified-but-present certs) doesn't help with. For that class of app, scope the `networkSecurityConfig` cleartext exception to private/link-local IP ranges only (RFC 1918 + link-local, never a wildcard, never a public-internet domain) and document the specific ranges/protocols in IDEA.md; internet-facing traffic from the same app still goes through the TLS/TOFU path above unchanged.
 - Certificate pinning is optional and per-host, with a documented rotation plan (backup pin) — never pin without one.
 
 ## Offline-first
@@ -1034,6 +1035,7 @@ Include only if the IDEA.md `## Applicability` matrix declares `backup_sync: yes
 - Restore path validates the manifest first (`validateBackup(uri)`), supports at least one prior format version, and reports per-domain restored counts.
 - Runtime-only tables are excluded (PART 5).
 - Export uses `ACTION_CREATE_DOCUMENT`; import uses `ACTION_OPEN_DOCUMENT` — both native SAF pickers, so the user chooses the destination/source path and filename. Never a hardcoded save location and never a custom in-app file browser as the only path — the same "user/OS owns the path, app only produces or consumes the file" principle as the web templates' Import/Export UI Convention.
+- **File-manager-class exception:** for the file-manager-class app defined in "Runtime permissions" (PART 2) and "Files" (PART 5), the app's own in-app path picker — the same one it already ships as its core feature, backed by `MANAGE_EXTERNAL_STORAGE` — is an equally valid destination/source for backup export/import, not just the SAF picker. The "user/OS owns the path" principle still holds: the user still explicitly chooses the path each time, through the app's own browsing UI instead of the system one, rather than a hardcoded location.
 
 ## SAF-based device sync (optional)
 
