@@ -1021,6 +1021,9 @@ Include only if the IDEA.md `## Applicability` matrix declares `network: yes`.
 - Connectivity state via `ConnectivityManager.NetworkCallback` exposed as `StateFlow` — never polling.
 - All network calls are `suspend` on `Dispatchers.IO`; never on Main (PART 0 threading discipline).
 - Every network error surfaces through the PART 2 error surfaces with a retry path; no raw exceptions to the user.
+- **Server-monitoring-class exception:** "never polling" above governs *connectivity-state detection* (is a network available right now) — it does not ban an app's own scheduled data polling. A server-monitoring app whose core feature is periodically checking remote endpoints implements that schedule as WorkManager periodic work or a `dataSync` foreground service (PART 8), never a manual busy-loop, and two needs follow directly from that core feature, both opt-in and off by default:
+  - Requesting `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` so Doze/App Standby doesn't silently stretch the schedule past what the user configured — rationale screen before the settings intent, exactly like any other permission (PART 2); when the user declines, the in-app schedule UI is honest that Doze still governs the actual interval.
+  - Holding a `PARTIAL_WAKE_LOCK` / `WifiManager.WifiLock` scoped to a single active poll cycle only — acquired immediately before and released immediately after that cycle, with a safety timeout, and only from within the foreground service doing the polling (PART 8) — never a lock held for the app's lifetime or acquired from a background component with no matching foreground service.
 
 ---
 
