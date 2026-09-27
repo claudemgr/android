@@ -98,7 +98,7 @@ and any exceptions.)
 3. Normalize discovered variables into lower_snake_case `key: value` entries
 4. If `internal_name` cannot be proven, initialize it to `project_name` on first migration and treat it as frozen after that. Do the same for `internal_org` ← `project_org`.
 5. If statements from `CLAUDE.md` or `.claude/CLAUDE.md` conflict with `AI.md`, `AI.md` wins
-6. After migration, keep root `CLAUDE.md` and/or `.claude/CLAUDE.md` only as short efficient loaders and keep the real plan/spec in `IDEA.md`
+6. After migration, keep root `CLAUDE.md` and/or `.claude/CLAUDE.md` only as short efficient loaders and keep the real plan/spec in `IDEA.md`, and mirror the final root `CLAUDE.md` content into `AGENTS.md` as a real file copy (never a symlink)
 7. Never silently discard meaningful project-specific content; migrate it, trim it, or explicitly ask where it belongs
 
 ---
@@ -210,6 +210,7 @@ Load PARTs on demand with `grep -n "^# PART N" AI.md` — never read this file e
 - `AI.md` is read-only during routine work
 - `IDEA.md` is where project-specific values and product rules live
 - Loader files (`CLAUDE.md`, `.claude/CLAUDE.md`) stay short and point back to `AI.md`
+- `AGENTS.md` at the project root is a real-file copy of `CLAUDE.md`'s exact content, kept in sync whenever `CLAUDE.md` changes — never a symlink (not portable across all platforms/filesystems)
 - If a loader file and `AI.md` disagree, `AI.md` wins
 - `.claude/memory/` holds durable, project-specific knowledge discovered during
   development — decisions, gotchas, conventions unique to this codebase — distinct
@@ -398,8 +399,9 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | Tool | Primary Loader | Alternate Loader | Personal Override |
 |------|----------------|------------------|------------------|
 | Claude Code | `CLAUDE.md` | `.claude/CLAUDE.md` | `CLAUDE.local.md` |
+| Other agents (Codex, Copilot, etc.) | `AGENTS.md` | - | - |
 
-**Loader rule:** loader files stay short. Long-form product content belongs in `IDEA.md`; long-form implementation policy belongs in `AI.md`.
+**Loader rule:** loader files stay short. Long-form product content belongs in `IDEA.md`; long-form implementation policy belongs in `AI.md`. `AGENTS.md` is always generated/reconciled as an exact real-file copy of root `CLAUDE.md` — never a symlink (not portable across all platforms/filesystems).
 
 ## Build commands
 
@@ -425,7 +427,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 7. **Keep `minSdk` working**; guard newer APIs with `Build.VERSION.SDK_INT`.
 8. **F-Droid flavor stays reproducible** (PART 13).
 9. **`Flow`/`StateFlow` only** for new reactive code.
-10. **AI.md is architecture, CLAUDE.md is a loader** — architecture changes update AI.md/IDEA.md; never add spec content to CLAUDE.md.
+10. **AI.md is architecture, CLAUDE.md is a loader** — architecture changes update AI.md/IDEA.md; never add spec content to CLAUDE.md. `AGENTS.md` mirrors `CLAUDE.md` exactly (real file copy, never a symlink).
 
 ## Commit workflow (required on every commit)
 
@@ -540,6 +542,7 @@ Every non-trivial user flow (onboarding, primary task, import/export) is documen
 ├── IDEA.md                       # project variables + business decisions
 ├── SPEC.md                       # optional rule overrides; may be empty
 ├── CLAUDE.md                     # short loader
+├── AGENTS.md                     # identical copy of CLAUDE.md, for non-Claude agents
 ├── CHANGELOG.md                  # Keep-a-Changelog format
 ├── README.md
 └── LICENSE.md
