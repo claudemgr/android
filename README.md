@@ -21,7 +21,7 @@ Template specifications for CasjaysDev Android projects. Each file is a master t
 - All builds run inside Docker via `casjaysdev/android:latest` — no host SDK, Gradle, or JDK
 - Store targets default to F-Droid + provider releases (GitHub/GitLab/Gitea/Forgejo); Google Play is opt-in
 - Applicability matrix in `IDEA.md` gates the conditional PARTs (database, network, notifications, background work, backup/sync, media)
-- `applicationId` is treated as frozen forever; existing apps keep their shipped identity
+- `applicationId` is frozen across renames; existing apps keep their shipped identity, and a fork resets it
 
 ## Related
 

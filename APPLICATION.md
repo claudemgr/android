@@ -48,9 +48,9 @@ Example:
 
     project_name:  notes
     project_org:   casjay
-    # FROZEN — set once at first-time setup, never edit
+    # STABLE — set at first-time setup; change only on an explicit rename or fork reset
     internal_name: notes
-    # FROZEN — set once at first-time setup, never edit
+    # STABLE — set at first-time setup; change only on an explicit rename or fork reset
     internal_org:  casjay
     app_name:      Notes
     app_id:        io.github.casjay.notes
@@ -96,7 +96,7 @@ and any exceptions.)
 1. Read existing `CLAUDE.md` and `.claude/CLAUDE.md` first - never overwrite blindly
 2. Extract valid project-specific content and reorganize it into the required `IDEA.md` layout
 3. Normalize discovered variables into lower_snake_case `key: value` entries
-4. If `internal_name` cannot be proven, initialize it to `project_name` on first migration and treat it as frozen after that. Do the same for `internal_org` ← `project_org`.
+4. If `internal_name` cannot be proven, initialize it to `project_name` on first migration and treat it as stable after that. Do the same for `internal_org` ← `project_org`.
 5. If statements from `CLAUDE.md` or `.claude/CLAUDE.md` conflict with `AI.md`, `AI.md` wins
 6. After migration, keep root `CLAUDE.md` and/or `.claude/CLAUDE.md` only as short efficient loaders and keep the real plan/spec in `IDEA.md`, and mirror the final root `CLAUDE.md` content into `AGENTS.md` as a real file copy (never a symlink)
 7. Never silently discard meaningful project-specific content; migrate it, trim it, or explicitly ask where it belongs
@@ -127,8 +127,8 @@ have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null ||
 |-------|----------------|----------|
 | `{project_name}` | IDEA.md `## Project variables` | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then `basename "$PWD"` |
 | `{project_org}` | IDEA.md `## Project variables` | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then `basename "$(dirname "$PWD")"` |
-| `{internal_name}` | IDEA.md `## Project variables` (set once at first run, never edited after) | First-time setup: copy from `{project_name}` |
-| `{internal_org}` | IDEA.md `## Project variables` (set once at first run, never edited after) | First-time setup: copy from `{project_org}` |
+| `{internal_name}` | IDEA.md `## Project variables` (set at first run; reset only on an explicit rename or fork) | First-time setup: copy from `{project_name}` |
+| `{internal_org}` | IDEA.md `## Project variables` (set at first run; reset only on an explicit rename or fork) | First-time setup: copy from `{project_org}` |
 | `{app_id}` | **Derived (not stored)**: `io.github.{internal_org}.{internal_name}` | Existing app: read `applicationId` from `app/build.gradle` and freeze it in IDEA.md |
 | `{app_id_path}` | **Derived (not stored)**: `{app_id}` with dots replaced by slashes, e.g. `com/example/app` | Recompute whenever `{app_id}` changes; never store separately |
 
@@ -141,7 +141,7 @@ internal_org="$project_org"
 app_id="io.github.${internal_org}.${internal_name}"
 ```
 
-**Why a separate `{internal_name}`:** if a project renames itself later, the new name applies to user-visible places (app label, docs, repo). But `{internal_name}` — and therefore `{app_id}` — stays fixed forever. **An Android `applicationId` can NEVER change after first release**: changing it publishes a different app, orphans every install, and breaks updates. `{app_id}` is the single most immutable value in an Android project.
+**Why a separate `{internal_name}`:** if a project renames itself later, the new name applies to user-visible places (app label, docs, repo). But `{internal_name}` — and therefore `{app_id}` — stays fixed across a rename. **An Android `applicationId` can NEVER change after first release**: changing it publishes a different app, orphans every install, and breaks updates. `{app_id}` is the single most immutable value in an Android project. On a fork, reset `{app_id}` (and `{internal_*}`) at first setup so the fork installs as its own app instead of colliding with the upstream.
 
 **Existing-app rule:** when this spec is dropped into an app that already shipped, the real `applicationId` from `app/build.gradle` WINS over the derived value — record it in IDEA.md as `app_id:` and never derive again.
 
@@ -277,7 +277,7 @@ Update these when their subject changes:
 - **ALWAYS resolve placeholders from `IDEA.md ## Project variables`** — `AI.md` is read-only; never edit placeholders in place
 - **ALWAYS load PARTs by slice** — `grep -n "^# PART N" AI.md`, read only that slice; cross-refs inside a slice: finish the slice first, then follow
 - **ALWAYS check the IDEA.md `## Applicability` matrix before applying a conditional PART** (5 database, 8 notifications/services/background, 9 network, 10 backup/sync) — an app that doesn't use the capability skips the PART entirely
-- **ALWAYS treat `{app_id}` as immutable** — never change `applicationId` in an app that has shipped
+- **ALWAYS treat `{app_id}` as immutable** — never change `applicationId` in an app that has shipped (a fork is a different app: it resets `{app_id}` at first setup)
 - **ALWAYS build inside Docker** using `casjaysdev/android:latest` (PART 4) — never install the Android SDK, Gradle, or a JDK on the host
 - **ALWAYS ship a Room migration with any schema change** (PART 5) — never destructive-migrate
 - **ALWAYS keep credentials out of the database** — Android Keystore–backed storage only (PART 6)
@@ -1267,11 +1267,11 @@ solves. Free-form prose, 1–3 paragraphs.}
 ## Project variables
 project_name: ...
 project_org: ...
-# FROZEN — set once at first-time setup, never edit
+# STABLE — set at first-time setup; change only on an explicit rename or fork reset
 internal_name: ...
-# FROZEN — set once at first-time setup, never edit
+# STABLE — set at first-time setup; change only on an explicit rename or fork reset
 internal_org: ...
-# FROZEN forever — from the shipped applicationId if the app already exists
+# FROZEN across renames — from the shipped applicationId if the app already exists; reset on a fork
 app_id: ...
 # Default 24, or the shipped value for an existing app
 min_sdk: 24
