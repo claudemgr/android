@@ -799,7 +799,7 @@ never bolt a silent-delete TTL onto `ENCRYPTED`.
 
 ## Theming
 
-- Material 3, dark mode default, `dark`/`light`/`auto` selectable.
+- Material 3, dark mode default, `dark`/`light`/`auto` selectable. The user's choice is stored in the preference wrapper (PART 5) and always wins over the system setting; `auto` follows the system dark-mode setting live, with no restart.
 - Never hardcode colors: theme attributes + a central theme definition. If the app has user-selectable themes, model them as a data class (name, isDark, semantic colors, optional palette) with a `ThemeManager` exposing the current theme as `StateFlow`.
 - Contrast validation for user-created/custom themes: WCAG 2.1 AA (4.5:1) minimum, AAA (7:1) advisory; surface issues in the theme editor in real time.
 
