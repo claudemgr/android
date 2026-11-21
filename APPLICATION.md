@@ -155,7 +155,7 @@ AI reads AI.md for the first time
 │   ├─► NO (setup needed)
 │   │   ├─► 1. Read IDEA.md / existing CLAUDE.md for values; fall back to
 │   │   │      directory-structure commands — never guess
-│   │   ├─► 2. Existing app? Read applicationId, versionName, minSdk from
+│   │   ├─► 2. Existing app? Read applicationId, minSdk from
 │   │   │      app/build.gradle — the shipped values always win
 │   │   ├─► 3. Confirm with user: "Project: {project_name}, Org: {project_org},
 │   │   │      App ID: {app_id} - correct?"
@@ -1162,7 +1162,7 @@ Driven by `store_targets:` in IDEA.md. **Default: `fdroid, provider-releases`** 
 
 Every channel runs the same skeleton — only the context differs (trigger, tag, version identity, build variant, prerelease flag):
 
-build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapping.txt` → `version.txt` (version, commit id, build epoch) → source archive (`git archive` → `{project_name}-{version}-source.tar.gz`) → SBOM (CycloneDX Gradle plugin → `{project_name}-sbom.cdx.json`) → aggregate `sha256.txt` + `sha512.txt` over every staged asset, computed LAST — never per-artifact `.sha256` sidecars → provenance attestation of every asset (GitHub only) → publish provider release.
+build (`VERSION` per the channel rule and `BUILD_EPOCH` captured once, both passed to Gradle as environment variables) → stage APK splits (PART 4 naming) + `mapping.txt` → `version.txt` (version, commit id, build epoch) → source archive (`git archive` → `{project_name}-{version}-source.tar.gz`) → SBOM (CycloneDX Gradle plugin → `{project_name}-sbom.cdx.json`) → aggregate `sha256.txt` + `sha512.txt` over every staged asset, computed LAST — never per-artifact `.sha256` sidecars → provenance attestation of every asset (GitHub only) → publish provider release.
 
 | Channel | Workflow | Trigger | Tag | Version identity | Variant | Prerelease |
 |---|---|---|---|---|---|---|
@@ -1177,21 +1177,23 @@ build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapp
 ## Versioning
 
 - `release.txt` is optional and read only by the Makefile for local builds (`make release`, the local `version.txt`): `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git); empty or missing means the devel rule. CI never reads it: stable = tag without `v`, beta = tag as-is, devel = short commit id. `versionName`/`versionCode` stay in-tree in every case.
-- Semver tags `vX.Y.Z`; `versionCode` monotonically increases (derive from semver: `X*10000 + Y*100 + Z` or maintain manually — pick once, record in IDEA.md).
-- Beta and devel builds keep the in-tree `versionCode`/`versionName` — channel identity lives in the tag and `version.txt`, never in a mutated `versionCode`.
+- Version identity uses the same rule as the go and rust templates: CI release = the stable tag without `v` (`vX.Y.Z` gives `X.Y.Z`); beta = `YYYYMMDDHHMMSS-beta` (the beta tag as-is); devel = the short commit id; local Makefile builds = `VERSION` env > non-empty `release.txt` > devel rule. CI never reads `release.txt`.
+- `versionName` is that `VERSION` in every channel and flavor, exposed as `BuildConfig.VERSION_NAME`; Gradle reads the `VERSION` environment variable (falling back to `devel` for IDE builds) and it is never hand-edited in `app/build.gradle`.
+- `versionCode` is `BUILD_EPOCH / 60` (integer minutes since the Unix epoch) in every channel and flavor — never hand-maintained, so IDEA.md carries no version-code scheme. Stable tags are semver `vX.Y.Z`.
 
 ### APK updates
 
 Users update by installing a newer APK over the installed one (sideload, an APK-tracking updater, `adb install -r`), across channels. Android accepts that only when all of these hold:
 
-- Same `applicationId` and same signing key in every channel (see Signing); a different key forces an uninstall and loses all app data.
+- Same `applicationId` and same signing key in every channel (see Signing); a different key forces an uninstall and loses all app data. F-Droid signs with its own key, so a provider-release APK and an F-Droid APK never update each other.
 - `versionCode` never decreases between installs. An equal `versionCode` installs as an in-place update; a lower one is rejected as a downgrade and needs an uninstall.
-- `versionCode` is bumped only in the commit that prepares a stable release, before it is tagged. Beta and devel builds share the in-tree value, so no beta or devel APK is ever newer than the stable release that follows it, and moving from devel or beta to stable is always an upgrade.
-- Beta and devel never change `versionCode` or `versionName` (above), so installed devel builds look identical to the installer and to the user. A new devel build is recognised by its commit id: the release name `Devel Build {commit id}`, `version.txt`, and the asset checksums. Updaters follow the stable `vX.Y.Z` releases by tag, beta by the `*beta` tag, and devel by the rolling `devel` release.
+- `versionCode` is `BUILD_EPOCH / 60`, so every later build is newer than every earlier one, across all channels: devel to devel, devel to beta, and a stable release to any later beta or devel build update in place. Only the reverse crosses a downgrade: going from a devel or beta build to a stable release that was built earlier needs an uninstall, so tell the user to export a backup (PART 10) first.
+- `versionName` is the channel `VERSION` (commit id, timestamp-beta or `X.Y.Z`), so the installer and the user see exactly which build is installed. A new devel build is also recognised by the release name `Devel Build {commit id}`, `version.txt` and the asset checksums.
 - The rolling `devel` release is deleted and recreated on every run, so asset names and the release's download URLs stay identical across channels and runs; never rename assets, the release or the tag per run, or updaters pointed at them stop finding new builds.
-- Moving to a lower `versionCode` is only possible by uninstalling first; tell the user to export a backup (PART 10) before doing so.
+- The `fdroidRelease` flavor pins `BUILD_EPOCH` to the tag commit's epoch, so its `versionCode` is reproducible: the F-Droid `Builds:` entry for a tag uses `git log -1 --format=%ct {tag}` divided by 60, and `versionName` is the tag without `v`.
+
 - **Short commit id** (devel channel's version identity, `version.txt`): `git rev-parse --short=7 HEAD` — pin the explicit 7-char length; git's unpinned `--short HEAD` auto-abbreviates and grows past 7 chars as the repo's commit count increases, producing inconsistent-length ids across builds.
-- **`BUILD_EPOCH` is embedded in every build, local and CI** — captured once per build (`date -u +%s`) and exposed as a `BuildConfig` field; the `fdroidRelease` flavor pins it to the last-commit epoch (`git log -1 --format=%ct`) to stay reproducible.
+- **`BUILD_EPOCH` is embedded in every build, local and CI** — captured once per build (`date -u +%s`) and exposed as a `BuildConfig` field and the source of `versionCode`; the `fdroidRelease` flavor pins it to the last-commit epoch (`git log -1 --format=%ct`) to stay reproducible.
 - Release notes generated from `CHANGELOG.md [Unreleased]`, which moves to a versioned section at tag time.
 
 ## Signing
@@ -1314,8 +1316,6 @@ agp: ...
 gradle: ...
 compile_sdk: ...
 target_sdk: ...
-# semver-derived or manual
-version_code_scheme: ...
 
 ## Business logic
 
