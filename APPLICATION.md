@@ -537,6 +537,7 @@ Every non-trivial user flow (onboarding, primary task, import/export) is documen
 ├── binaries/                     # debug APK output (gitignored)
 ├── releases/                     # release APK output (gitignored)
 ├── Makefile
+├── release.txt                   # optional local-build version (Makefile only; empty = devel rule)
 ├── .gitignore                    # required; must cover binaries/, releases/, .gradle/, keystore.jks, .env*
 ├── AI.md                         # this spec (read-only)
 ├── IDEA.md                       # project variables + business decisions
@@ -1175,7 +1176,7 @@ build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapp
 
 ## Versioning
 
-- No `release.txt`: version identity is the tag (stable `vX.Y.Z` gives `X.Y.Z`, beta tag as-is, devel short commit id) and `versionName`/`versionCode` stay in-tree; a `release.txt` present in the repo is ignored by every channel and by the Makefile.
+- `release.txt` is optional and read only by the Makefile for local builds (`make release`, the local `version.txt`): `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git); empty or missing means the devel rule. CI never reads it: stable = tag without `v`, beta = tag as-is, devel = short commit id. `versionName`/`versionCode` stay in-tree in every case.
 - Semver tags `vX.Y.Z`; `versionCode` monotonically increases (derive from semver: `X*10000 + Y*100 + Z` or maintain manually — pick once, record in IDEA.md).
 - Beta and devel builds keep the in-tree `versionCode`/`versionName` — channel identity lives in the tag and `version.txt`, never in a mutated `versionCode`.
 - **Short commit id** (devel channel's version identity, `version.txt`): `git rev-parse --short=7 HEAD` — pin the explicit 7-char length; git's unpinned `--short HEAD` auto-abbreviates and grows past 7 chars as the repo's commit count increases, producing inconsistent-length ids across builds.
