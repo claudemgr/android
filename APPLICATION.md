@@ -1112,10 +1112,10 @@ Every project targets all five CI/CD providers — same gates, different syntax,
 
 | Gate | GitHub | GitLab | Gitea / Forgejo | Jenkins | Trigger | Job |
 |---|---|---|---|---|---|---|
-| CI | `ci.yml` | `build` + `test` + `security` stages | `ci.yml` | `Build` + `Test` + `Security` stages | push + PR to main + `workflow_dispatch` | `make check`-equivalent: compile, lint, unit tests, structure/security validation |
+| CI | `ci.yml` | `build` + `test` + `security` stages | `ci.yml` | `Build` + `Test` + `Security` stages | push + PR to main + weekly cron (security jobs) + `workflow_dispatch` | the `make check` tasks spelled out as explicit commands: compile, lint, unit tests, structure/security validation |
 | Devel | `devel.yml` | `devel` stage (schedule + push-triggered) | `devel.yml` | `Devel` stage (schedule + push-triggered) | daily schedule + push to main + `workflow_dispatch` | canonical release flow (PART 13) on the `devel` variant → rolling `devel` prerelease |
-| Beta | `beta.yml` | `beta` stage (tag-triggered) | `beta.yml` | `Beta` stage (tag-triggered) | tag `*beta` + `workflow_dispatch` | canonical release flow (PART 13) on the `release` variant → prerelease |
-| Release | `release.yml` | `release` stage (tag-triggered) | `release.yml` | `Release` stage (tag-triggered) | tag `v*` + `workflow_dispatch` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
+| Beta | `beta.yml` | `beta` stage (branch-triggered) | `beta.yml` | `Beta` stage (branch-triggered) | push to `beta` branch + `workflow_dispatch` | canonical release flow (PART 13) on the `release` variant; the workflow creates the `YYYYMMDDHHMMSS-beta` tag → prerelease |
+| Release | `release.yml` | `release` stage (tag-triggered) | `release.yml` | `Release` stage (tag-triggered) | tag push (`v*`, `*.*.*`) + `workflow_dispatch` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
 
 **Container-job user rule:** every GitHub Actions-syntax `container:` job (e.g. `container: image: casjaysdev/android:latest`) MUST set `options: "--user 0:0"`. The runner (and actions/checkout's post-job cleanup) execs into the job container — e.g. `cat /etc/*release` for OS diagnostics — as a user the image's `/etc/passwd` may not define, which fails or flakes the job after all real work already passed. Numeric `0:0` needs no `/etc/passwd` lookup, so it is immune regardless of the image's user table.
 
@@ -1133,6 +1133,14 @@ Creation order: security-only workflows first, `ci.yml` and the channel workflow
 - Custom security greps (e.g. hardcoded-password patterns) maintain their exclusion list in the workflow with a documented reason per exclusion — never delete an exclusion without checking why it exists.
 - Release-managing jobs that run inside the toolchain container (the `devel.yml` rolling delete + recreate, asset uploads) use the provider CLI (`gh`/`glab`/`tea`) shipped in the image — never inline-installed in a step.
 - Renovate for dependency updates — never Dependabot.
+- **Workflow permissions:** `contents: read` at the workflow level as the baseline; `contents: write`, `id-token: write` and `attestations: write` only on the job that publishes the release, never workflow-wide.
+- **Concurrency:** every push, PR and branch workflow (`ci.yml`, `beta.yml`, `devel.yml`) declares `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`. `release.yml` uses a per-tag group (`release-${{ github.ref }}`) with `cancel-in-progress: true`: a newer run of the same tag cancels the older one, and a different tag never cancels another.
+- **Artifact retention:** every `actions/upload-artifact` step sets `retention-days: 7` or shorter.
+- **No Makefile in CI:** workflow steps run explicit commands (Gradle tasks inside the toolchain image) with all environment variables inlined — never `make {target}`. The Makefile is for local convenience only, so CI cannot drift with it.
+- **Portability:** no hardcoded org, project name, official site or registry in any workflow; use the provider's variables (`${{ github.repository_owner }}`, `${{ github.event.repository.name }}` and equivalents) so a fork works without edits.
+- **Fork PRs:** they receive no secrets and no publish permissions; PR runs never need the keystore. The keystore hard-fail applies to the three release channels only.
+- **Weekly security run:** the secret-scan and dependency jobs also run on a weekly cron (`0 6 * * 1`); the scheduled secret scan covers the full history (`verified` results only).
+- **Release pre-flight:** the devel and beta jobs own their tag. `devel.yml` deletes the `devel` release and tag and recreates them at the current commit; `beta.yml` creates the `YYYYMMDDHHMMSS-beta` tag at the current commit. Both check out with `fetch-depth: 0`, and `contents: write` covers the tag push. `release.yml` fails with an `::error::` message when it is not triggered by a tag ref or the tag contains whitespace or control characters. Every validation failure uses `::error::` with a message that says what failed and what to do next.
 
 ## Post-Push CI Verification
 
@@ -1166,10 +1174,11 @@ build (`VERSION` per the channel rule and `BUILD_EPOCH` captured once, both pass
 
 | Channel | Workflow | Trigger | Tag | Version identity | Variant | Prerelease |
 |---|---|---|---|---|---|---|
-| stable | `release.yml` | tag push | `vX.Y.Z` | tag without `v` | `release` | no |
-| beta | `beta.yml` | tag push | `*beta` | tag as-is | `release` | yes |
+| stable | `release.yml` | tag push | `vX.Y.Z` or `X.Y.Z` | tag without `v` | `release` | no |
+| beta | `beta.yml` | push to `beta` branch | `YYYYMMDDHHMMSS-beta`, created by the workflow | the timestamp, computed once per run | `release` | yes |
 | devel | `devel.yml` | daily schedule + push to main | rolling `devel` — release and tag deleted + recreated on every run | short commit id | `devel` | yes |
 
+- Release names: stable `v{version}`, beta `{YYYYMMDDHHMMSS}-beta`, devel `Devel Build {commit id}`; beta and devel are marked prerelease, stable is marked latest. Only one devel release exists at any time.
 - **No docker-image publishing in any channel** — this is an Android app; there is no runtime image to release. Builds still execute inside `casjaysdev/android:latest` (PART 4): that is the toolchain, not a release artifact.
 - The `devel` variant (PART 4) enables devel/debug features and the Debug Log; Logger sanitation (PART 6) applies in every variant.
 - Asset names are identical across channels — channel identity lives in the tag, the release object, and `version.txt`, never in mutated filenames.
@@ -1177,7 +1186,7 @@ build (`VERSION` per the channel rule and `BUILD_EPOCH` captured once, both pass
 ## Versioning
 
 - `release.txt` is optional and read only by the Makefile for local builds (`make release`, the local `version.txt`): `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git); empty or missing means the devel rule. CI never reads it: stable = tag without `v`, beta = tag as-is, devel = short commit id. `versionName`/`versionCode` stay in-tree in every case.
-- Version identity uses the same rule as the go and rust templates: CI release = the stable tag without `v` (`vX.Y.Z` gives `X.Y.Z`); beta = `YYYYMMDDHHMMSS-beta` (the beta tag as-is); devel = the short commit id; local Makefile builds = `VERSION` env > non-empty `release.txt` > devel rule. CI never reads `release.txt`.
+- Version identity uses the same rule as the go and rust templates: CI release = the stable tag without `v` (`vX.Y.Z` gives `X.Y.Z`); beta = `YYYYMMDDHHMMSS-beta` (the timestamp computed once in CI, also the tag the workflow creates); devel = the short commit id; local Makefile builds = `VERSION` env > non-empty `release.txt` > devel rule. CI never reads `release.txt`.
 - `versionName` is that `VERSION` in every channel and flavor, exposed as `BuildConfig.VERSION_NAME`; Gradle reads the `VERSION` environment variable (falling back to `devel` for IDE builds) and it is never hand-edited in `app/build.gradle`.
 - `versionCode` is `BUILD_EPOCH / 60` (integer minutes since the Unix epoch) in every channel and flavor — never hand-maintained, so IDEA.md carries no version-code scheme. Stable tags are semver `vX.Y.Z`.
 
