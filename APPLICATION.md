@@ -1229,7 +1229,7 @@ Sample resolution step (applies identically to all three workflows):
     echo "Keystore decoded and ready"
 ```
 
-Never commit a fixed fallback password (the `Makefile`'s dev-keystore default excepted, since that keystore is itself a throwaway, gitignored, never-committed dev artifact regenerated on demand). Reference implementation: `/root/Projects/github/tabssh/android/.github/workflows/{beta,release}.yml` — note that as of this writing `development.yml` in that project still uses an ephemeral-keystore fallback, which is the pattern this spec explicitly rejects; that workflow is due for a follow-up update to match `beta.yml`/`release.yml`.
+Never commit a fixed fallback password (the `Makefile`'s dev-keystore default excepted, since that keystore is itself a throwaway, gitignored, never-committed dev artifact regenerated on demand). Reference implementation: `/root/Projects/github/tabssh/android/.github/workflows/{devel,beta,release}.yml`.
 
 ## R8 / ProGuard
 
