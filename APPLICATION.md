@@ -1179,6 +1179,17 @@ build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapp
 - `release.txt` is optional and read only by the Makefile for local builds (`make release`, the local `version.txt`): `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git); empty or missing means the devel rule. CI never reads it: stable = tag without `v`, beta = tag as-is, devel = short commit id. `versionName`/`versionCode` stay in-tree in every case.
 - Semver tags `vX.Y.Z`; `versionCode` monotonically increases (derive from semver: `X*10000 + Y*100 + Z` or maintain manually — pick once, record in IDEA.md).
 - Beta and devel builds keep the in-tree `versionCode`/`versionName` — channel identity lives in the tag and `version.txt`, never in a mutated `versionCode`.
+
+### APK updates
+
+Users update by installing a newer APK over the installed one (sideload, an APK-tracking updater, `adb install -r`), across channels. Android accepts that only when all of these hold:
+
+- Same `applicationId` and same signing key in every channel (see Signing); a different key forces an uninstall and loses all app data.
+- `versionCode` never decreases between installs. An equal `versionCode` installs as an in-place update; a lower one is rejected as a downgrade and needs an uninstall.
+- `versionCode` is bumped only in the commit that prepares a stable release, before it is tagged. Beta and devel builds share the in-tree value, so no beta or devel APK is ever newer than the stable release that follows it, and moving from devel or beta to stable is always an upgrade.
+- Beta and devel never change `versionCode` or `versionName` (above), so installed devel builds look identical to the installer and to the user. A new devel build is recognised by its commit id: the release name `Devel Build {commit id}`, `version.txt`, and the asset checksums. Updaters follow the stable `vX.Y.Z` releases by tag, beta by the `*beta` tag, and devel by the rolling `devel` release.
+- The rolling `devel` release is deleted and recreated on every run, so asset names and the release's download URLs stay identical across channels and runs; never rename assets, the release or the tag per run, or updaters pointed at them stop finding new builds.
+- Moving to a lower `versionCode` is only possible by uninstalling first; tell the user to export a backup (PART 10) before doing so.
 - **Short commit id** (devel channel's version identity, `version.txt`): `git rev-parse --short=7 HEAD` — pin the explicit 7-char length; git's unpinned `--short HEAD` auto-abbreviates and grows past 7 chars as the repo's commit count increases, producing inconsistent-length ids across builds.
 - **`BUILD_EPOCH` is embedded in every build, local and CI** — captured once per build (`date -u +%s`) and exposed as a `BuildConfig` field; the `fdroidRelease` flavor pins it to the last-commit epoch (`git log -1 --format=%ct`) to stay reproducible.
 - Release notes generated from `CHANGELOG.md [Unreleased]`, which moves to a versioned section at tag time.
