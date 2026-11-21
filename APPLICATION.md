@@ -613,7 +613,7 @@ This picks the toolchain image only; any runtime/service image the project ships
 |---|---|
 | `debug` | Local dev; debuggable; `.debug` applicationId suffix optional |
 | `release` | Shipped build; R8 minify + shrinkResources; signed |
-| `devel` | Development-channel build (PART 13): `release` configuration plus devel/debug features and the Debug Log enabled via `BuildConfig` flags (`DEVEL`, `DEBUG_LOG`); not debuggable; signed; Logger sanitation (PART 6) applies here too — the Debug Log is never exempt |
+| `devel` | Devel-channel build (PART 13): `release` configuration plus devel/debug features and the Debug Log enabled via `BuildConfig` flags (`DEVEL`, `DEBUG_LOG`); not debuggable; signed; Logger sanitation (PART 6) applies here too — the Debug Log is never exempt |
 | `fdroidRelease` | Reproducible flavor for F-Droid (PART 13) — only if the app targets F-Droid |
 
 ## APK splits and naming
@@ -1112,13 +1112,13 @@ Every project targets all five CI/CD providers — same gates, different syntax,
 | Gate | GitHub | GitLab | Gitea / Forgejo | Jenkins | Trigger | Job |
 |---|---|---|---|---|---|---|
 | CI | `ci.yml` | `build` + `test` + `security` stages | `ci.yml` | `Build` + `Test` + `Security` stages | push + PR to main + `workflow_dispatch` | `make check`-equivalent: compile, lint, unit tests, structure/security validation |
-| Development | `development.yml` | `development` stage (schedule + push-triggered) | `development.yml` | `Development` stage (schedule + push-triggered) | daily schedule + push to main + `workflow_dispatch` | canonical release flow (PART 13) on the `devel` variant → rolling `development` prerelease |
+| Devel | `devel.yml` | `devel` stage (schedule + push-triggered) | `devel.yml` | `Devel` stage (schedule + push-triggered) | daily schedule + push to main + `workflow_dispatch` | canonical release flow (PART 13) on the `devel` variant → rolling `devel` prerelease |
 | Beta | `beta.yml` | `beta` stage (tag-triggered) | `beta.yml` | `Beta` stage (tag-triggered) | tag `*beta` + `workflow_dispatch` | canonical release flow (PART 13) on the `release` variant → prerelease |
 | Release | `release.yml` | `release` stage (tag-triggered) | `release.yml` | `Release` stage (tag-triggered) | tag `v*` + `workflow_dispatch` | tests + DependencyCheck + coverage → canonical release flow (PART 13) on the `release` variant (+ `assembleFdroidRelease` smoke build if F-Droid flavor exists; + `bundleRelease` AAB only if `store_targets` includes `play`) → provider release |
 
 **Container-job user rule:** every GitHub Actions-syntax `container:` job (e.g. `container: image: casjaysdev/android:latest`) MUST set `options: "--user 0:0"`. The runner (and actions/checkout's post-job cleanup) execs into the job container — e.g. `cat /etc/*release` for OS diagnostics — as a user the image's `/etc/passwd` may not define, which fails or flakes the job after all real work already passed. Numeric `0:0` needs no `/etc/passwd` lookup, so it is immune regardless of the image's user table.
 
-Creation order: security-only workflows first, `ci.yml` and the channel workflows (`release.yml`, `beta.yml`, `development.yml`) last; every staged workflow passes `act --list -W {file}` before commit (GitHub Actions-syntax providers only — GitLab and Jenkins have no `act` equivalent, validate those with their own native lint: `gitlab-ci-lint` / Jenkins `Pipeline Linter`).
+Creation order: security-only workflows first, `ci.yml` and the channel workflows (`release.yml`, `beta.yml`, `devel.yml`) last; every staged workflow passes `act --list -W {file}` before commit (GitHub Actions-syntax providers only — GitLab and Jenkins have no `act` equivalent, validate those with their own native lint: `gitlab-ci-lint` / Jenkins `Pipeline Linter`).
 
 ## Rules
 
@@ -1126,11 +1126,11 @@ Creation order: security-only workflows first, `ci.yml` and the channel workflow
 - Third-party actions pinned to full commit SHAs, never tags.
 - Signing keystore decoded from a `KEYSTORE_BASE64` secret at job time — never committed.
 - Gradle cache keyed on `hashFiles('**/*.gradle*', '**/gradle-wrapper.properties')`.
-- TruffleHog secret scan on every push/PR.
+- TruffleHog secret scan on every push and PR: a host-runner job (no `container:`), SHA-pinned, with `fetch-depth: 0`. Range scans (PR `base.sha` to `head.sha`; push `event.before` to `event.after`) fail on `verified` and `unknown` results; a new-branch push (`before` all zeros) or manual run scans the full history and fails on `verified` only. `base` is never `default_branch` (after a push it equals HEAD and the scan is skipped). Always pass `--exclude-paths=.github/trufflehog-exclude.txt` (same path on every provider; one regex per line, no comments); it lists only non-production files: `^AI\.md$`, `^gradle/verification-metadata\.xml$` when dependency verification is on, and the fixtures directory `(^|/)app/src/test/resources/fixtures/`; adding a path needs a reason in the commit message. Documentation examples never hold a credential-shaped string (connection strings use `{user}:{password}` placeholders); fixture values are obviously fake, and a test that needs a credential-shaped string builds it at run time; a reviewed true false positive is allowlisted with truffleHog's inline `trufflehog:ignore` comment. GitLab and Jenkins run the same contract in Docker: `trufflehog git file://. --since-commit HEAD~1 --results=verified,unknown --exclude-paths=.github/trufflehog-exclude.txt --fail` for a range, `trufflehog git file://. --results=verified --exclude-paths=.github/trufflehog-exclude.txt --fail` for the full history.
 - Public repos ship `.github/SECURITY.md`: supported versions, private vulnerability reporting as the primary channel (never a public issue tracker), and the disclosure timeline. `CODEOWNERS` lists explicit owners for workflows, signing/release files, and crypto/Keystore code.
 - OWASP DependencyCheck in `release.yml`; CVSS ≥ 7.0 fails; suppressions live in `.github/dependency-check-suppressions.xml` (shared by every provider's workflow) with a reason comment per entry — never a root-level `config/` directory, which is globally forbidden.
 - Custom security greps (e.g. hardcoded-password patterns) maintain their exclusion list in the workflow with a documented reason per exclusion — never delete an exclusion without checking why it exists.
-- Release-managing jobs that run inside the toolchain container (the `development.yml` rolling delete + recreate, asset uploads) use the provider CLI (`gh`/`glab`/`tea`) shipped in the image — never inline-installed in a step.
+- Release-managing jobs that run inside the toolchain container (the `devel.yml` rolling delete + recreate, asset uploads) use the provider CLI (`gh`/`glab`/`tea`) shipped in the image — never inline-installed in a step.
 - Renovate for dependency updates — never Dependabot.
 
 ## Post-Push CI Verification
@@ -1167,7 +1167,7 @@ build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapp
 |---|---|---|---|---|---|---|
 | stable | `release.yml` | tag push | `vX.Y.Z` | tag without `v` | `release` | no |
 | beta | `beta.yml` | tag push | `*beta` | tag as-is | `release` | yes |
-| development | `development.yml` | daily schedule + push to main | rolling `development` — release and tag deleted + recreated on every run | short commit id | `devel` | yes |
+| devel | `devel.yml` | daily schedule + push to main | rolling `devel` — release and tag deleted + recreated on every run | short commit id | `devel` | yes |
 
 - **No docker-image publishing in any channel** — this is an Android app; there is no runtime image to release. Builds still execute inside `casjaysdev/android:latest` (PART 4): that is the toolchain, not a release artifact.
 - The `devel` variant (PART 4) enables devel/debug features and the Debug Log; Logger sanitation (PART 6) applies in every variant.
@@ -1176,8 +1176,8 @@ build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapp
 ## Versioning
 
 - Semver tags `vX.Y.Z`; `versionCode` monotonically increases (derive from semver: `X*10000 + Y*100 + Z` or maintain manually — pick once, record in IDEA.md).
-- Beta and development builds keep the in-tree `versionCode`/`versionName` — channel identity lives in the tag and `version.txt`, never in a mutated `versionCode`.
-- **Short commit id** (development channel's version identity, `version.txt`): `git rev-parse --short=7 HEAD` — pin the explicit 7-char length; git's unpinned `--short HEAD` auto-abbreviates and grows past 7 chars as the repo's commit count increases, producing inconsistent-length ids across builds.
+- Beta and devel builds keep the in-tree `versionCode`/`versionName` — channel identity lives in the tag and `version.txt`, never in a mutated `versionCode`.
+- **Short commit id** (devel channel's version identity, `version.txt`): `git rev-parse --short=7 HEAD` — pin the explicit 7-char length; git's unpinned `--short HEAD` auto-abbreviates and grows past 7 chars as the repo's commit count increases, producing inconsistent-length ids across builds.
 - **`BUILD_EPOCH` is embedded in every build, local and CI** — captured once per build (`date -u +%s`) and exposed as a `BuildConfig` field; the `fdroidRelease` flavor pins it to the last-commit epoch (`git log -1 --format=%ct`) to stay reproducible.
 - Release notes generated from `CHANGELOG.md [Unreleased]`, which moves to a versioned section at tag time.
 
@@ -1189,14 +1189,14 @@ build (`BUILD_EPOCH` captured once) → stage APK splits (PART 4 naming) + `mapp
 
 ### `KEYSTORE_PASSWORD` / `KEY_PASSWORD` resolution
 
-Always use the CI secret / env var — never a hardcoded fallback, and never an ephemeral/generated fallback. This applies uniformly to **all three channels** (`development.yml`, `beta.yml`, `release.yml`): every channel is a release, every APK it produces must chain to the one escrowed production key, so every channel hard-fails the same way when the secrets aren't configured.
+Always use the CI secret / env var — never a hardcoded fallback, and never an ephemeral/generated fallback. This applies uniformly to **all three channels** (`devel.yml`, `beta.yml`, `release.yml`): every channel is a release, every APK it produces must chain to the one escrowed production key, so every channel hard-fails the same way when the secrets aren't configured.
 
 | Context | Value |
 |---|---|
 | Local (dev keystore) | `password` — set as a `Makefile` `?=` default (`KEYSTORE_PASSWORD ?= password`, `KEY_PASSWORD ?= password`, both `export`ed), never overridden by CI since `?=` skips already-exported vars; fixed because `keystore.jks` is a throwaway dev artifact regenerated by `scripts/generate-keystore.sh` |
-| CI/CD, all channels (`development.yml`, `beta.yml`, `release.yml`) | `secrets.KEYSTORE_BASE64` and `secrets.KEYSTORE_PASSWORD` are **required** — the step hard-fails (`exit 1`) with an actionable `::error::` message naming the exact missing secret and where to set it (repo Settings > Secrets and Variables > Actions) if either is absent. `secrets.KEY_PASSWORD` is optional and falls back to `KEYSTORE_PASSWORD` itself (`${KEY_PW:-$KEYSTORE_PW}`) — never a hardcoded literal — matching how the project's release keystore was generated (key shares the store password when no separate key password was set) |
+| CI/CD, all channels (`devel.yml`, `beta.yml`, `release.yml`) | `secrets.KEYSTORE_BASE64` and `secrets.KEYSTORE_PASSWORD` are **required** — the step hard-fails (`exit 1`) with an actionable `::error::` message naming the exact missing secret and where to set it (repo Settings > Secrets and Variables > Actions) if either is absent. `secrets.KEY_PASSWORD` is optional and falls back to `KEYSTORE_PASSWORD` itself (`${KEY_PW:-$KEYSTORE_PW}`) — never a hardcoded literal — matching how the project's release keystore was generated (key shares the store password when no separate key password was set) |
 
-No channel — including `development.yml` on a fork or before secrets are provisioned — ever falls back to a generated/ephemeral keystore. A fallback build would be update-compatible with nothing and silently misleading; failing loudly with setup instructions is preferred over shipping a broken artifact.
+No channel — including `devel.yml` on a fork or before secrets are provisioned — ever falls back to a generated/ephemeral keystore. A fallback build would be update-compatible with nothing and silently misleading; failing loudly with setup instructions is preferred over shipping a broken artifact.
 
 Sample resolution step (applies identically to all three workflows):
 
